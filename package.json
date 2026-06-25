@@ -9,6 +9,7 @@
   "main": "./src/cli.mjs",
   "scripts": {
     "start": "node src/cli.mjs",
+    "test": "node --test tests/unit.test.mjs",
     "scan": "node scripts/secrets-scan.mjs --staged --block",
     "scan:all": "node scripts/secrets-scan.mjs --all-tracked --block",
     "prepare": "husky"

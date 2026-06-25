@@ -30,3 +30,12 @@ export function currentScheduler() {
       return linuxImpl;
   }
 }
+
+/**
+ * Shared error factory for scheduler stubs. Keeps the magic string
+ * "not implemented" in one place so callers can match on it (e.g. the
+ * uninstall command tolerates this specific failure to allow --purge).
+ */
+export function notImplementedError(os, method) {
+  return new Error(`scheduler.${os}.${method}: not implemented`);
+}

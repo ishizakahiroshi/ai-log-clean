@@ -9,9 +9,9 @@
  *     session-state). The whole directory archives or deletes as a unit.
  */
 
-import { readdir, stat, mkdir, rename, rm } from "node:fs/promises";
+import { readdir, stat, mkdir, rename, rm, cp } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, relative, dirname } from "node:path";
+import { join, relative, dirname, isAbsolute, extname } from "node:path";
 
 /**
  * Walk a directory recursively and yield absolute file paths.
@@ -102,13 +102,53 @@ export async function safeStat(path) {
  * Move a path into the quarantine root, preserving the provider + relative
  * sub-path. e.g.
  *   archivePath = ~/.ai-log-clean/quarantine/2026-06-25/codex/2026/06/01/rollout-foo.jsonl
+ *
+ * Hardening:
+ *   - Refuses to write outside the quarantine subtree: if the relative path
+ *     escapes sourceRoot (starts with `..`) or is absolute, throws so a
+ *     provider bug or hostile symlink can't redirect us elsewhere.
+ *   - Falls back to copy+remove on EXDEV (cross-filesystem rename), which
+ *     fires when ~/.ai-log-clean lives on a different volume than the
+ *     provider's session directory (e.g. profile on D: with quarantine on C:).
+ *   - Avoids clobbering an existing quarantine target by appending `.2`,
+ *     `.3`, ... — `fs.rename` cannot atomically replace an existing directory
+ *     on either POSIX or Windows, and we'd rather keep the older copy than
+ *     fail the whole run.
  */
 export async function moveToQuarantine({ source, sourceRoot, provider, quarantineRoot, today }) {
   const rel = relative(sourceRoot, source);
-  const target = join(quarantineRoot, today, provider, rel);
-  await mkdir(dirname(target), { recursive: true });
-  await rename(source, target);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(
+      `refusing to quarantine: source ${JSON.stringify(source)} is not inside sourceRoot ${JSON.stringify(sourceRoot)}`,
+    );
+  }
+  const baseTarget = join(quarantineRoot, today, provider, rel);
+  const target = await pickFreeName(baseTarget);
+  await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+  try {
+    await rename(source, target);
+  } catch (err) {
+    if (err && err.code === "EXDEV") {
+      // Cross-device: fall back to a recursive copy + remove. fs.cp handles
+      // both files and directories.
+      await cp(source, target, { recursive: true, force: false, errorOnExist: true });
+      await rm(source, { recursive: true, force: true });
+    } else {
+      throw err;
+    }
+  }
   return target;
+}
+
+async function pickFreeName(basePath) {
+  if (!existsSync(basePath)) return basePath;
+  const ext = extname(basePath);
+  const stem = ext ? basePath.slice(0, -ext.length) : basePath;
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${stem}.${i}${ext}`;
+    if (!existsSync(candidate)) return candidate;
+  }
+  throw new Error(`quarantine target already exists and 998 fallback names are taken: ${basePath}`);
 }
 
 /**

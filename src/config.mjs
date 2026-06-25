@@ -56,7 +56,37 @@ export function effectiveRetentionDays(cfg, provider) {
 
 export async function loadConfig() {
   // TODO: wire a TOML parser and read CONFIG_FILE. For now, defaults only.
-  return defaultConfig();
+  const cfg = defaultConfig();
+  validateConfigShape(cfg);
+  return cfg;
+}
+
+/**
+ * Guarantees the invariant downstream code relies on: every name in
+ * PROVIDERS has a corresponding `cfg.providers[name]` entry with an
+ * `enabled` field. Catches drift between PROVIDERS and defaultConfig() /
+ * a future TOML loader before it shows up as a runtime TypeError in
+ * `run.mjs` or `list.mjs`.
+ */
+export function validateConfigShape(cfg) {
+  if (!cfg || typeof cfg !== "object") {
+    throw new Error("loadConfig: returned non-object");
+  }
+  if (!cfg.defaults || typeof cfg.defaults.retentionDays !== "number") {
+    throw new Error("loadConfig: missing defaults.retentionDays");
+  }
+  if (typeof cfg.defaults.delete !== "boolean") {
+    throw new Error("loadConfig: missing defaults.delete");
+  }
+  if (!cfg.providers || typeof cfg.providers !== "object") {
+    throw new Error("loadConfig: missing providers");
+  }
+  for (const name of PROVIDERS) {
+    const p = cfg.providers[name];
+    if (!p || typeof p.enabled !== "boolean") {
+      throw new Error(`loadConfig: providers.${name}.enabled missing or not boolean`);
+    }
+  }
 }
 
 export const CONFIG_TEMPLATE = `# ai-log-clean config

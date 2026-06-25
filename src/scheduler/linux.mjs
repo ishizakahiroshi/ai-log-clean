@@ -10,19 +10,21 @@
  * which we'll detect and instruct the user about rather than running ourselves.
  */
 
+import { notImplementedError } from "./index.mjs";
+
 export const UNIT_NAME = "ai-log-clean";
 
 export async function install(_opts) {
-  throw new Error("scheduler.linux.install: not implemented");
+  throw notImplementedError("linux", "install");
 }
 export async function uninstall() {
-  throw new Error("scheduler.linux.uninstall: not implemented");
+  throw notImplementedError("linux", "uninstall");
 }
 export async function disable() {
-  throw new Error("scheduler.linux.disable: not implemented");
+  throw notImplementedError("linux", "disable");
 }
 export async function enable() {
-  throw new Error("scheduler.linux.enable: not implemented");
+  throw notImplementedError("linux", "enable");
 }
 export async function status() {
   return { installed: false, enabled: false };

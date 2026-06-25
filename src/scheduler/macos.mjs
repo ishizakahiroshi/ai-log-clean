@@ -9,19 +9,21 @@
  * Output is captured to ~/.ai-log-clean/cleanup.log.
  */
 
+import { notImplementedError } from "./index.mjs";
+
 export const LABEL = "com.ai-log-clean";
 
 export async function install(_opts) {
-  throw new Error("scheduler.macos.install: not implemented");
+  throw notImplementedError("macos", "install");
 }
 export async function uninstall() {
-  throw new Error("scheduler.macos.uninstall: not implemented");
+  throw notImplementedError("macos", "uninstall");
 }
 export async function disable() {
-  throw new Error("scheduler.macos.disable: not implemented");
+  throw notImplementedError("macos", "disable");
 }
 export async function enable() {
-  throw new Error("scheduler.macos.enable: not implemented");
+  throw notImplementedError("macos", "enable");
 }
 export async function status() {
   return { installed: false, enabled: false };

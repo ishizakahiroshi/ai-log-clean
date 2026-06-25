@@ -19,13 +19,32 @@ export async function run(argv) {
   });
 
   const scheduler = currentScheduler();
-  await scheduler.uninstall();
+  let schedulerError = null;
+  try {
+    await scheduler.uninstall();
+  } catch (err) {
+    // Don't let an unregistered (or unimplemented) scheduler block --purge.
+    // A user purging a half-installed setup, or one that was never installed,
+    // should still be able to wipe config + quarantine.
+    schedulerError = err instanceof Error ? err.message : String(err);
+  }
 
   if (values.purge) {
     await rm(CONFIG_DIR, { recursive: true, force: true });
-    process.stdout.write(`uninstalled and purged ${CONFIG_DIR}\n`);
-  } else {
-    process.stdout.write(`uninstalled (config preserved at ${CONFIG_DIR})\n`);
+    if (schedulerError) {
+      process.stdout.write(
+        `purged ${CONFIG_DIR} (scheduler uninstall reported: ${schedulerError})\n`,
+      );
+    } else {
+      process.stdout.write(`uninstalled and purged ${CONFIG_DIR}\n`);
+    }
+    return 0;
   }
+
+  if (schedulerError) {
+    process.stderr.write(`scheduler uninstall failed: ${schedulerError}\n`);
+    return 1;
+  }
+  process.stdout.write(`uninstalled (config preserved at ${CONFIG_DIR})\n`);
   return 0;
 }

@@ -12,19 +12,21 @@
  * and does not require admin to register.
  */
 
+import { notImplementedError } from "./index.mjs";
+
 export const TASK_NAME = "ai-log-clean";
 
 export async function install(_opts) {
-  throw new Error("scheduler.windows.install: not implemented");
+  throw notImplementedError("windows", "install");
 }
 export async function uninstall() {
-  throw new Error("scheduler.windows.uninstall: not implemented");
+  throw notImplementedError("windows", "uninstall");
 }
 export async function disable() {
-  throw new Error("scheduler.windows.disable: not implemented");
+  throw notImplementedError("windows", "disable");
 }
 export async function enable() {
-  throw new Error("scheduler.windows.enable: not implemented");
+  throw notImplementedError("windows", "enable");
 }
 export async function status() {
   return { installed: false, enabled: false };

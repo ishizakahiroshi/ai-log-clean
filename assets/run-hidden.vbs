@@ -37,9 +37,13 @@ If Not fso.FileExists(psScript) Then
     WScript.Quit 2
 End If
 
+' Use the absolute system path only. Falling back to a bare "powershell.exe"
+' would resolve via PATH, opening a PATH-hijacking surface in environments
+' where an attacker can drop a binary earlier in PATH than System32.
 powerShellExe = fso.BuildPath(shell.ExpandEnvironmentStrings("%SystemRoot%"), "System32\WindowsPowerShell\v1.0\powershell.exe")
 If Not fso.FileExists(powerShellExe) Then
-    powerShellExe = "powershell.exe"
+    LogStartupError "powershell.exe not found at " & powerShellExe & " (refusing PATH fallback)"
+    WScript.Quit 2
 End If
 
 ' Collect remaining arguments (skip index 0 = the .ps1 path itself)

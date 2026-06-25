@@ -18,7 +18,7 @@ import { parseArgs } from "node:util";
 import { readdir, stat } from "node:fs/promises";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 
 import {
   loadConfig,
@@ -38,14 +38,18 @@ import {
 const QUARANTINE_RETENTION_DAYS = 30;
 
 async function pruneQuarantine() {
-  if (!existsSync(QUARANTINE_DIR)) return 0;
+  if (!existsSync(QUARANTINE_DIR)) return { removed: 0, failed: 0 };
   const cutoff = Date.now() - QUARANTINE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   let removed = 0;
+  let failed = 0;
   let entries;
   try {
     entries = await readdir(QUARANTINE_DIR, { withFileTypes: true });
-  } catch {
-    return 0;
+  } catch (err) {
+    process.stderr.write(
+      `  quarantine prune: cannot read ${QUARANTINE_DIR} — ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return { removed: 0, failed: 1 };
   }
   for (const e of entries) {
     if (!e.isDirectory()) continue;
@@ -56,11 +60,14 @@ async function pruneQuarantine() {
         await removePath(full);
         removed++;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      failed++;
+      process.stderr.write(
+        `  quarantine prune: failed on ${e.name} — ${err instanceof Error ? err.message : String(err)}\n`,
+      );
     }
   }
-  return removed;
+  return { removed, failed };
 }
 
 export async function run(argv) {
@@ -79,15 +86,32 @@ export async function run(argv) {
 
   const cfg = await loadConfig();
   if (values["retention-days"]) {
-    cfg.defaults.retentionDays = Number.parseInt(String(values["retention-days"]), 10);
+    const n = Number.parseInt(String(values["retention-days"]), 10);
+    if (!Number.isFinite(n) || n < 1) {
+      process.stderr.write(`--retention-days must be a positive integer\n`);
+      return 2;
+    }
+    cfg.defaults.retentionDays = n;
   }
   if (values.delete) {
     cfg.defaults.delete = true;
   }
-  const maxDeletes = values["max-deletes"]
-    ? Number.parseInt(String(values["max-deletes"]), 10)
-    : Infinity;
+  let maxDeletes = Infinity;
+  if (values["max-deletes"]) {
+    const n = Number.parseInt(String(values["max-deletes"]), 10);
+    if (!Number.isFinite(n) || n < 0) {
+      process.stderr.write(`--max-deletes must be a non-negative integer\n`);
+      return 2;
+    }
+    maxDeletes = n;
+  }
   const onlyProvider = values.provider ? String(values.provider) : null;
+  if (onlyProvider && !PROVIDERS.includes(onlyProvider)) {
+    process.stderr.write(
+      `--provider must be one of: ${PROVIDERS.join(", ")} (got ${JSON.stringify(onlyProvider)})\n`,
+    );
+    return 2;
+  }
   const dryRun = Boolean(values["dry-run"]);
   const deleteMode = cfg.defaults.delete;
 
@@ -100,16 +124,20 @@ export async function run(argv) {
   }
   process.stdout.write("\n");
 
+  let worstExit = 0;
+
   if (!dryRun) {
-    await mkdir(CONFIG_DIR, { recursive: true });
-    const purged = await pruneQuarantine();
+    await mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
+    const { removed: purged, failed: pruneFailed } = await pruneQuarantine();
     if (purged > 0) {
       process.stdout.write(`  (pruned ${purged} expired quarantine batch(es))\n\n`);
+    }
+    if (pruneFailed > 0) {
+      worstExit = 1;
     }
   }
 
   const today = todayStamp();
-  let worstExit = 0;
   let actedProviders = 0;
   let totalActed = 0;
   let totalSize = 0;
@@ -157,8 +185,10 @@ export async function run(argv) {
             bytesActed += c.size;
             remainingBudget--;
           } catch (err) {
+            // Mask the full path: log only the basename + kind so a captured
+            // stderr does not leak the absolute project / session layout.
             process.stderr.write(
-              `    ${provider}: ${c.path} — ${err instanceof Error ? err.message : String(err)}\n`,
+              `    ${provider}: ${c.kind} ${basename(c.path)} — ${err instanceof Error ? err.message : String(err)}\n`,
             );
           }
         }
