@@ -2,12 +2,12 @@
 /**
  * ai-log-clean CLI entrypoint.
  *
- * Subcommand router. Each subcommand is a thin shell over a module in this
- * directory. Stubs here keep the surface honest while the actual provider /
- * scheduler logic is being filled in.
+ * Hand-rolled router: find the first non-option argument (the subcommand)
+ * and pass everything else through to that subcommand's parser. The
+ * top-level deliberately does NOT use parseArgs for subcommand option
+ * parsing, because parseArgs would consume `--retention-days` etc. before
+ * the subcommand sees them.
  */
-
-import { parseArgs } from "node:util";
 
 const SUBCOMMANDS = {
   install: (rest) => import("./commands/install.mjs").then((m) => m.run(rest)),
@@ -25,7 +25,7 @@ ai-log-clean — trim old AI CLI session logs across providers and platforms.
 
 Usage:
   ai-log-clean <subcommand> [options]
-  ai-log-clean --dry-run                  # shorthand for 'run --dry-run'
+  ai-log-clean --dry-run [options]        # shorthand for 'run --dry-run [options]'
 
 Subcommands:
   install     Register a daily cleanup job on this OS
@@ -48,49 +48,43 @@ Subcommands:
 
 Examples:
   bunx github:ishizakahiroshi/ai-log-clean --dry-run
+  bunx github:ishizakahiroshi/ai-log-clean --dry-run --retention-days 30
   bunx github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60
-  bunx github:ishizakahiroshi/ai-log-clean status
+  bunx github:ishizakahiroshi/ai-log-clean list
   bunx github:ishizakahiroshi/ai-log-clean uninstall --purge
 
 Documentation: https://github.com/ishizakahiroshi/ai-log-clean
 `;
 
 async function main(argv) {
-  const { values, positionals } = parseArgs({
-    args: argv,
-    options: {
-      help: { type: "boolean", short: "h" },
-      version: { type: "boolean", short: "v" },
-      "dry-run": { type: "boolean" },
-    },
-    strict: false,
-    allowPositionals: true,
-  });
-
-  if (values.help) {
+  if (argv.includes("--help") || argv.includes("-h")) {
     process.stdout.write(USAGE);
     return 0;
   }
-  if (values.version) {
+  if (argv.includes("--version") || argv.includes("-v")) {
     process.stdout.write("ai-log-clean (development)\n");
     return 0;
   }
 
-  if (positionals.length === 0) {
-    if (values["dry-run"]) {
-      return SUBCOMMANDS.run(["--dry-run"]);
+  // Find the first known subcommand name. Anything else (including stray
+  // values like '30' after '--retention-days 30') passes through.
+  const subIdx = argv.findIndex((a) =>
+    Object.prototype.hasOwnProperty.call(SUBCOMMANDS, a),
+  );
+
+  if (subIdx === -1) {
+    // No explicit subcommand. Treat as `run` shorthand if any flag is present;
+    // otherwise show usage.
+    if (argv.length === 0) {
+      process.stdout.write(USAGE);
+      return 0;
     }
-    process.stdout.write(USAGE);
-    return 0;
+    return SUBCOMMANDS.run(argv);
   }
 
-  const [sub, ...rest] = positionals;
+  const sub = argv[subIdx];
+  const rest = [...argv.slice(0, subIdx), ...argv.slice(subIdx + 1)];
   const handler = SUBCOMMANDS[sub];
-  if (!handler) {
-    process.stderr.write(`Unknown subcommand: ${sub}\n\n`);
-    process.stderr.write(USAGE);
-    return 2;
-  }
   try {
     return await handler(rest);
   } catch (err) {
