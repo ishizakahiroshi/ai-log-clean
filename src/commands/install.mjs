@@ -10,9 +10,9 @@
  */
 
 import { parseArgs } from "node:util";
-import { currentScheduler } from "../scheduler/index.ts";
+import { currentScheduler } from "../scheduler/index.mjs";
 
-export async function run(argv: string[]): Promise<number> {
+export async function run(argv) {
   const { values } = parseArgs({
     args: argv,
     options: {

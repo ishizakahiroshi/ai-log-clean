@@ -1,8 +1,8 @@
 /** `list` subcommand: show current size + oldest file per provider. */
-import { loadConfig, PROVIDERS } from "../config.ts";
-import { PROVIDER_REGISTRY } from "../providers/index.ts";
+import { loadConfig, PROVIDERS } from "../config.mjs";
+import { PROVIDER_REGISTRY } from "../providers/index.mjs";
 
-export async function run(_argv: string[]): Promise<number> {
+export async function run(_argv) {
   const cfg = await loadConfig();
   process.stdout.write(`provider       enabled  size       oldest                 newest\n`);
   for (const provider of PROVIDERS) {
@@ -24,7 +24,7 @@ export async function run(_argv: string[]): Promise<number> {
   return 0;
 }
 
-function formatSize(bytes: number): string {
+function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;

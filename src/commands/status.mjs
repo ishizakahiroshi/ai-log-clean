@@ -1,7 +1,7 @@
 /** `status` subcommand: show schedule registration + last run. */
-import { currentScheduler } from "../scheduler/index.ts";
+import { currentScheduler } from "../scheduler/index.mjs";
 
-export async function run(_argv: string[]): Promise<number> {
+export async function run(_argv) {
   const s = await currentScheduler().status();
   process.stdout.write(
     [

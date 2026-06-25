@@ -26,37 +26,21 @@ export const PROVIDERS = [
   "cursor_agent",
   "opencode",
   "grok",
-] as const;
-
-export type ProviderName = (typeof PROVIDERS)[number];
-
-export interface ProviderConfig {
-  enabled: boolean;
-  retentionDays?: number;
-  excludeFiles?: string[];
-}
-
-export interface AiLogCleanConfig {
-  defaults: {
-    retentionDays: number;
-    delete: boolean;
-  };
-  providers: Record<ProviderName, ProviderConfig>;
-}
+];
 
 export const CONFIG_DIR = join(homedir(), ".ai-log-clean");
 export const CONFIG_FILE = join(CONFIG_DIR, "config.toml");
 export const QUARANTINE_DIR = join(CONFIG_DIR, "quarantine");
 export const LOG_FILE = join(CONFIG_DIR, "cleanup.log");
 
-export function defaultConfig(): AiLogCleanConfig {
+export function defaultConfig() {
   return {
     defaults: {
       retentionDays: 60,
       delete: false,
     },
     providers: {
-      claude_code: { enabled: false }, // defer to Claude Code's own cleanupPeriodDays
+      claude_code: { enabled: false },
       codex: { enabled: true },
       copilot: { enabled: true },
       cursor_agent: { enabled: true },
@@ -66,29 +50,15 @@ export function defaultConfig(): AiLogCleanConfig {
   };
 }
 
-/**
- * Resolve effective retention for a provider: per-provider override or default.
- */
-export function effectiveRetentionDays(
-  cfg: AiLogCleanConfig,
-  provider: ProviderName,
-): number {
+export function effectiveRetentionDays(cfg, provider) {
   return cfg.providers[provider].retentionDays ?? cfg.defaults.retentionDays;
 }
 
-/**
- * Load config.toml from disk. Returns defaults if the file does not exist.
- * TODO: wire a TOML parser (e.g. `@iarna/toml` or `smol-toml`) and validate.
- */
-export async function loadConfig(): Promise<AiLogCleanConfig> {
-  // TODO: read CONFIG_FILE and parse. For now, defaults only.
+export async function loadConfig() {
+  // TODO: wire a TOML parser and read CONFIG_FILE. For now, defaults only.
   return defaultConfig();
 }
 
-/**
- * Write a config template to ~/.ai-log-clean/config.toml.
- * Used by the `init` subcommand.
- */
 export const CONFIG_TEMPLATE = `# ai-log-clean config
 # Documentation: https://github.com/ishizakahiroshi/ai-log-clean
 

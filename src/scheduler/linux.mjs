@@ -10,32 +10,20 @@
  * which we'll detect and instruct the user about rather than running ourselves.
  */
 
-import type { InstallOptions, ScheduleStatus } from "./index.ts";
-
 export const UNIT_NAME = "ai-log-clean";
 
-export async function install(_opts: InstallOptions): Promise<void> {
-  // TODO: write {service,timer}, then `systemctl --user daemon-reload`
-  // and `systemctl --user enable --now ai-log-clean.timer`.
+export async function install(_opts) {
   throw new Error("scheduler.linux.install: not implemented");
 }
-
-export async function uninstall(): Promise<void> {
-  // systemctl --user disable --now ai-log-clean.timer ; rm units
+export async function uninstall() {
   throw new Error("scheduler.linux.uninstall: not implemented");
 }
-
-export async function disable(): Promise<void> {
-  // systemctl --user stop ai-log-clean.timer
+export async function disable() {
   throw new Error("scheduler.linux.disable: not implemented");
 }
-
-export async function enable(): Promise<void> {
-  // systemctl --user start ai-log-clean.timer
+export async function enable() {
   throw new Error("scheduler.linux.enable: not implemented");
 }
-
-export async function status(): Promise<ScheduleStatus> {
-  // systemctl --user list-timers ai-log-clean.timer
+export async function status() {
   return { installed: false, enabled: false };
 }

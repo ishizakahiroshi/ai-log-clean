@@ -5,10 +5,10 @@
 
 import { parseArgs } from "node:util";
 import { rm } from "node:fs/promises";
-import { CONFIG_DIR } from "../config.ts";
-import { currentScheduler } from "../scheduler/index.ts";
+import { CONFIG_DIR } from "../config.mjs";
+import { currentScheduler } from "../scheduler/index.mjs";
 
-export async function run(argv: string[]): Promise<number> {
+export async function run(argv) {
   const { values } = parseArgs({
     args: argv,
     options: {

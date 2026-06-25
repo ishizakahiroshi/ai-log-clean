@@ -4,12 +4,11 @@
   "description": "Trim old session logs from Claude Code, Codex CLI, GitHub Copilot CLI, Cursor Agent, opencode, and Grok. Cross-platform daily auto-clean with configurable retention.",
   "type": "module",
   "bin": {
-    "ai-log-clean": "./src/cli.ts"
+    "ai-log-clean": "./src/cli.mjs"
   },
-  "main": "./src/cli.ts",
+  "main": "./src/cli.mjs",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "start": "bun run src/cli.ts",
+    "start": "node src/cli.mjs",
     "scan": "node scripts/secrets-scan.mjs --staged --block",
     "scan:all": "node scripts/secrets-scan.mjs --all-tracked --block",
     "prepare": "husky"
@@ -50,8 +49,6 @@
     "CHANGELOG.md"
   ],
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "husky": "^9.0.0",
-    "typescript": "^5.6.0"
+    "husky": "^9.0.0"
   }
 }

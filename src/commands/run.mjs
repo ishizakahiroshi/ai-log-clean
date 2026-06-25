@@ -5,10 +5,10 @@
  */
 
 import { parseArgs } from "node:util";
-import { loadConfig, effectiveRetentionDays, PROVIDERS } from "../config.ts";
-import { PROVIDER_REGISTRY } from "../providers/index.ts";
+import { loadConfig, effectiveRetentionDays, PROVIDERS } from "../config.mjs";
+import { PROVIDER_REGISTRY } from "../providers/index.mjs";
 
-export async function run(argv: string[]): Promise<number> {
+export async function run(argv) {
   const { values } = parseArgs({
     args: argv,
     options: {

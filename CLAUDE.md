@@ -25,10 +25,10 @@ ai-log-clean は、各 AI コーディング CLI（Claude Code / Codex CLI / Git
 
 | レイヤ | 採用 |
 |---|---|
-| 言語 | TypeScript |
-| ランタイム / ビルド | bun（Node 互換も維持・`bun build` / `tsc` 両方で通る） |
-| パッケージマネージャ | bun（contributors 向け） |
-| CLI 引数 | 軽量自前ルーター or bun の `Bun.argv` ベース（TBD） |
+| 言語 | 素の JavaScript（ESM `.mjs`・ビルド不要） |
+| ランタイム | Node.js 20+（`bunx` / `bun x` / `npx` のいずれでも動く） |
+| パッケージマネージャ | bun（contributors 向け）／ユーザーは何も install しない |
+| CLI 引数 | `node:util` の `parseArgs`（依存ゼロ） |
 | config | `~/.ai-log-clean/config.toml`（TOML パーサで読む） |
 | OS スケジューラ | Windows=schtasks+wscript.exe+run-hidden.vbs / macOS=launchd / Linux=systemd --user timer |
 | 配布 | GitHub のみ（`bunx github:ishizakahiroshi/ai-log-clean ...` で直接実行） |
@@ -38,8 +38,9 @@ ai-log-clean は、各 AI コーディング CLI（Claude Code / Codex CLI / Git
 ```
 ai-log-clean/
 ├─ src/
-│  ├─ cli.ts                 # サブコマンドルーター
-│  ├─ config.ts              # ~/.ai-log-clean/config.toml の読み書き
+│  ├─ cli.mjs                # サブコマンドルーター
+│  ├─ config.mjs             # ~/.ai-log-clean/config.toml の読み書き
+│  ├─ commands/              # サブコマンド本体（install / uninstall / run / list 等）
 │  ├─ providers/             # provider ごとの掃除ロジック（claude-code / codex / copilot / cursor-agent / opencode / grok）
 │  └─ scheduler/             # OS 別スケジューラ登録（windows / macos / linux）
 ├─ assets/
@@ -62,9 +63,9 @@ ai-log-clean/
 
 開発者向け:
 
-- 型チェック: `bun run typecheck`
-- ローカルで実行: `bun run src/cli.ts --dry-run`
+- ローカルで実行: `node src/cli.mjs --dry-run` または `bun src/cli.mjs --dry-run`
 - secrets-scan 手動実行: `node scripts/secrets-scan.mjs --staged --block`
+- **ビルドステップなし**: `.mjs` を直接配布。`main` に push したら次回 `bunx` 起動で反映される
 
 ## 運用ルール（このプロジェクト固有）
 

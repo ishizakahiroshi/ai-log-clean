@@ -12,34 +12,20 @@
  * and does not require admin to register.
  */
 
-import type { InstallOptions, ScheduleStatus } from "./index.ts";
-
 export const TASK_NAME = "ai-log-clean";
 
-export async function install(_opts: InstallOptions): Promise<void> {
-  // TODO: resolve bunx absolute path, copy run-hidden.vbs to
-  // %LOCALAPPDATA%/ai-log-clean/, then run:
-  //   schtasks /Create /TN ai-log-clean /SC DAILY /ST <opts.at>
-  //     /TR "wscript.exe ..." /F
+export async function install(_opts) {
   throw new Error("scheduler.windows.install: not implemented");
 }
-
-export async function uninstall(): Promise<void> {
-  // schtasks /Delete /TN ai-log-clean /F
+export async function uninstall() {
   throw new Error("scheduler.windows.uninstall: not implemented");
 }
-
-export async function disable(): Promise<void> {
-  // schtasks /Change /TN ai-log-clean /DISABLE
+export async function disable() {
   throw new Error("scheduler.windows.disable: not implemented");
 }
-
-export async function enable(): Promise<void> {
-  // schtasks /Change /TN ai-log-clean /ENABLE
+export async function enable() {
   throw new Error("scheduler.windows.enable: not implemented");
 }
-
-export async function status(): Promise<ScheduleStatus> {
-  // schtasks /Query /TN ai-log-clean /XML, parse next-run + last-run.
+export async function status() {
   return { installed: false, enabled: false };
 }

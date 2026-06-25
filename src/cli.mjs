@@ -9,17 +9,15 @@
 
 import { parseArgs } from "node:util";
 
-type SubcommandHandler = (rest: string[]) => Promise<number>;
-
-const SUBCOMMANDS: Record<string, SubcommandHandler> = {
-  install: (rest) => import("./commands/install.ts").then((m) => m.run(rest)),
-  uninstall: (rest) => import("./commands/uninstall.ts").then((m) => m.run(rest)),
-  disable: (rest) => import("./commands/disable.ts").then((m) => m.run(rest)),
-  enable: (rest) => import("./commands/enable.ts").then((m) => m.run(rest)),
-  status: (rest) => import("./commands/status.ts").then((m) => m.run(rest)),
-  run: (rest) => import("./commands/run.ts").then((m) => m.run(rest)),
-  list: (rest) => import("./commands/list.ts").then((m) => m.run(rest)),
-  init: (rest) => import("./commands/init.ts").then((m) => m.run(rest)),
+const SUBCOMMANDS = {
+  install: (rest) => import("./commands/install.mjs").then((m) => m.run(rest)),
+  uninstall: (rest) => import("./commands/uninstall.mjs").then((m) => m.run(rest)),
+  disable: (rest) => import("./commands/disable.mjs").then((m) => m.run(rest)),
+  enable: (rest) => import("./commands/enable.mjs").then((m) => m.run(rest)),
+  status: (rest) => import("./commands/status.mjs").then((m) => m.run(rest)),
+  run: (rest) => import("./commands/run.mjs").then((m) => m.run(rest)),
+  list: (rest) => import("./commands/list.mjs").then((m) => m.run(rest)),
+  init: (rest) => import("./commands/init.mjs").then((m) => m.run(rest)),
 };
 
 const USAGE = `\
@@ -57,8 +55,7 @@ Examples:
 Documentation: https://github.com/ishizakahiroshi/ai-log-clean
 `;
 
-async function main(argv: string[]): Promise<number> {
-  // Handle `--help` / `-h` / `--version` before subcommand dispatch.
+async function main(argv) {
   const { values, positionals } = parseArgs({
     args: argv,
     options: {
@@ -79,17 +76,16 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  // Bare `ai-log-clean --dry-run` is shorthand for `run --dry-run`.
   if (positionals.length === 0) {
     if (values["dry-run"]) {
-      return SUBCOMMANDS.run!(["--dry-run"]);
+      return SUBCOMMANDS.run(["--dry-run"]);
     }
     process.stdout.write(USAGE);
     return 0;
   }
 
   const [sub, ...rest] = positionals;
-  const handler = SUBCOMMANDS[sub!];
+  const handler = SUBCOMMANDS[sub];
   if (!handler) {
     process.stderr.write(`Unknown subcommand: ${sub}\n\n`);
     process.stderr.write(USAGE);

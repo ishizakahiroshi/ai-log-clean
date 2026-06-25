@@ -16,34 +16,11 @@
  */
 
 import { platform } from "node:os";
-import * as windowsImpl from "./windows.ts";
-import * as macosImpl from "./macos.ts";
-import * as linuxImpl from "./linux.ts";
+import * as windowsImpl from "./windows.mjs";
+import * as macosImpl from "./macos.mjs";
+import * as linuxImpl from "./linux.mjs";
 
-export interface InstallOptions {
-  at: string; // HH:MM (24h)
-  retentionDays: number;
-  delete: boolean;
-  interactive: boolean;
-}
-
-export interface ScheduleStatus {
-  installed: boolean;
-  enabled: boolean;
-  nextRun?: Date;
-  lastRun?: Date;
-  lastExitCode?: number;
-}
-
-export interface Scheduler {
-  install(opts: InstallOptions): Promise<void>;
-  uninstall(): Promise<void>;
-  disable(): Promise<void>;
-  enable(): Promise<void>;
-  status(): Promise<ScheduleStatus>;
-}
-
-export function currentScheduler(): Scheduler {
+export function currentScheduler() {
   switch (platform()) {
     case "win32":
       return windowsImpl;

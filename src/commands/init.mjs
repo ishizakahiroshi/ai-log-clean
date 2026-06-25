@@ -1,8 +1,8 @@
 /** `init` subcommand: write a config.toml template to ~/.ai-log-clean/. */
 import { mkdir, writeFile, stat } from "node:fs/promises";
-import { CONFIG_DIR, CONFIG_FILE, CONFIG_TEMPLATE } from "../config.ts";
+import { CONFIG_DIR, CONFIG_FILE, CONFIG_TEMPLATE } from "../config.mjs";
 
-export async function run(_argv: string[]): Promise<number> {
+export async function run(_argv) {
   await mkdir(CONFIG_DIR, { recursive: true });
   try {
     await stat(CONFIG_FILE);
