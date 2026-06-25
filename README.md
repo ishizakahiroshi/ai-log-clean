@@ -14,25 +14,30 @@ You don't install this package. Run it straight from GitHub.
 
 ```sh
 # Try it (does not modify anything)
+npx -y github:ishizakahiroshi/ai-log-clean --dry-run
+
+# Bun users — bunx works too, but it caches GitHub specs aggressively
+# (see "Distribution model" below if you stop seeing new commits)
 bunx github:ishizakahiroshi/ai-log-clean --dry-run
 
-# Same, with npm
-npx github:ishizakahiroshi/ai-log-clean --dry-run
-
 # See current sizes / oldest files per provider
-bunx github:ishizakahiroshi/ai-log-clean list
+npx -y github:ishizakahiroshi/ai-log-clean list
 
 # Install a daily 12:00 cleanup with 60-day retention
-bunx github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60
+npx -y github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60
 
 # Pause without losing your config
-bunx github:ishizakahiroshi/ai-log-clean disable
-bunx github:ishizakahiroshi/ai-log-clean enable
+npx -y github:ishizakahiroshi/ai-log-clean disable
+npx -y github:ishizakahiroshi/ai-log-clean enable
 
 # Remove the schedule and (optionally) the config + logs
-bunx github:ishizakahiroshi/ai-log-clean uninstall
-bunx github:ishizakahiroshi/ai-log-clean uninstall --purge
+npx -y github:ishizakahiroshi/ai-log-clean uninstall
+npx -y github:ishizakahiroshi/ai-log-clean uninstall --purge
 ```
+
+`npx -y` is the recommended runner — it fetches the GitHub HEAD on every
+invocation, so a fix on `main` reaches you on the next run. `-y` skips the
+"download and run" prompt, which matters when the scheduler triggers it.
 
 `install` detects your OS and registers a user-scope scheduled job — no `sudo`, no UAC prompt:
 
@@ -51,7 +56,7 @@ bunx github:ishizakahiroshi/ai-log-clean uninstall --purge
 | opencode | `$XDG_DATA_HOME/opencode/log/*.log`, `.../storage/session_diff/*.json` | No | Per-file. XDG path is resolved per OS (`~/.local/share/`, `~/Library/Application Support/`, `%APPDATA%`). |
 | Grok | `~/.grok/sessions/<encoded>/<uuid>/` | No | Per-session-directory. `~/.grok/logs/unified.jsonl` is **excluded** because it is append-only — pruning it mid-stream would corrupt the journal. |
 
-You can disable any provider or set per-provider retention in `~/.ai-log-clean/config.toml` (`bunx github:ishizakahiroshi/ai-log-clean init` writes a template).
+You can disable any provider or set per-provider retention in `~/.ai-log-clean/config.toml` (`npx -y github:ishizakahiroshi/ai-log-clean init` writes a template).
 
 ## Safety model
 
@@ -94,17 +99,29 @@ enabled       = true
 exclude_files = ["logs/unified.jsonl"]
 ```
 
-`bunx github:ishizakahiroshi/ai-log-clean init` writes this template to `~/.ai-log-clean/config.toml`.
+`npx -y github:ishizakahiroshi/ai-log-clean init` writes this template to `~/.ai-log-clean/config.toml`.
 
 ## Distribution model
 
-`ai-log-clean` is **not published to npm**. Both `bunx` and `npx` accept GitHub specs (`github:owner/repo`), so installation is a single command that doesn't leave anything globally on your machine. `main` is the only release channel — push = ship.
+`ai-log-clean` is **not published to npm**. Both `npx` and `bunx` accept GitHub specs (`github:owner/repo`), so installation is a single command that doesn't leave anything globally on your machine. `main` is the only release channel — push = ship.
 
-Trade-off: a bad commit on `main` ships immediately. That's exactly why the default behavior is archive-only with `--max-deletes`. If you want a frozen reference, pin a commit:
+**Recommended runner: `npx -y`.** npx hits the GitHub HEAD on every run, so a `git push` to `main` reaches users on their next invocation. bunx caches GitHub specs aggressively — bun users may keep running an older commit until the cache is cleared.
+
+Force-refresh or pin a specific commit:
 
 ```sh
+# Force bunx to refetch on next run (PowerShell)
+Remove-Item -Recurse -Force "$env:TEMP\bunx-*ai-log-clean*"
+
+# Force bunx to refetch on next run (bash / zsh)
+rm -rf "${TMPDIR:-/tmp}"/bunx-*ai-log-clean*
+
+# Or pin a specific commit (works with both npx and bunx)
+npx -y 'github:ishizakahiroshi/ai-log-clean#<commit-sha>' install
 bunx 'github:ishizakahiroshi/ai-log-clean#<commit-sha>' install
 ```
+
+Trade-off: a bad commit on `main` ships immediately. That's exactly why the default behavior is archive-only with `--max-deletes`.
 
 ## Sibling project
 

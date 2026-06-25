@@ -14,25 +14,28 @@ English: [README.md](./README.md)
 
 ```sh
 # 試す（何も壊さない）
+npx -y github:ishizakahiroshi/ai-log-clean --dry-run
+
+# bun 派の場合（bunx は GitHub spec のキャッシュが強めなので、
+# 新版が来ないなと感じたら下記「配布モデル」を参照）
 bunx github:ishizakahiroshi/ai-log-clean --dry-run
 
-# npm 派なら
-npx github:ishizakahiroshi/ai-log-clean --dry-run
-
 # 各 provider の現在の容量・最古ファイルを見る
-bunx github:ishizakahiroshi/ai-log-clean list
+npx -y github:ishizakahiroshi/ai-log-clean list
 
 # 日次 12:00・retention 60 日でセットアップ
-bunx github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60
+npx -y github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60
 
 # 一時停止（設定は残す）／ 再開
-bunx github:ishizakahiroshi/ai-log-clean disable
-bunx github:ishizakahiroshi/ai-log-clean enable
+npx -y github:ishizakahiroshi/ai-log-clean disable
+npx -y github:ishizakahiroshi/ai-log-clean enable
 
 # 完全に止める（設定・ログも消すなら --purge）
-bunx github:ishizakahiroshi/ai-log-clean uninstall
-bunx github:ishizakahiroshi/ai-log-clean uninstall --purge
+npx -y github:ishizakahiroshi/ai-log-clean uninstall
+npx -y github:ishizakahiroshi/ai-log-clean uninstall --purge
 ```
+
+推奨は `npx -y`。npx は毎回 GitHub HEAD を見に行くので、`main` への push が次回起動から即反映されます。`-y` は「ダウンロードして実行しますか?」プロンプトをスキップする指定で、スケジューラから呼ばれる時に重要です。
 
 `install` は OS を自動判定し、ユーザースコープでスケジュール登録します（`sudo` / UAC 不要）:
 
@@ -51,7 +54,7 @@ bunx github:ishizakahiroshi/ai-log-clean uninstall --purge
 | opencode | `$XDG_DATA_HOME/opencode/log/*.log`, `.../storage/session_diff/*.json` | なし | ファイル単位。XDG パスは OS 別に解決（Linux `~/.local/share/`、macOS `~/Library/Application Support/`、Windows `%APPDATA%`）。 |
 | Grok | `~/.grok/sessions/<encoded>/<uuid>/` | なし | セッションディレクトリ単位。`~/.grok/logs/unified.jsonl` は append-only なので **対象外**（部分削除すると整合性が壊れる）。 |
 
-provider 単位の有効/無効・retention 上書きは `~/.ai-log-clean/config.toml` で設定できます（`bunx github:ishizakahiroshi/ai-log-clean init` で雛形生成）。
+provider 単位の有効/無効・retention 上書きは `~/.ai-log-clean/config.toml` で設定できます（`npx -y github:ishizakahiroshi/ai-log-clean init` で雛形生成）。
 
 ## 安全設計
 
@@ -94,17 +97,29 @@ enabled       = true
 exclude_files = ["logs/unified.jsonl"]
 ```
 
-`bunx github:ishizakahiroshi/ai-log-clean init` でこの雛形が `~/.ai-log-clean/config.toml` に書き出されます。
+`npx -y github:ishizakahiroshi/ai-log-clean init` でこの雛形が `~/.ai-log-clean/config.toml` に書き出されます。
 
 ## 配布モデル
 
-`ai-log-clean` は **npm registry に publish していません**。`bunx` / `npx` ともに GitHub spec（`github:owner/repo`）を受け取れるので、1 コマンドで実行でき、PC 上にグローバルインストール物が残りません。リリースチャネルは `main` ブランチ 1 本のみ。push = 配布です。
+`ai-log-clean` は **npm registry に publish していません**。`npx` / `bunx` ともに GitHub spec（`github:owner/repo`）を受け取れるので、1 コマンドで実行でき、PC 上にグローバルインストール物が残りません。リリースチャネルは `main` ブランチ 1 本のみ。push = 配布です。
 
-トレードオフ: `main` への悪い commit は即配布されます。だからこそ既定挙動を「アーカイブ + `--max-deletes`」にしています。固定したい場合はコミットを pin できます:
+**推奨ランナーは `npx -y`。** npx は毎回 GitHub HEAD を見るので、`main` への push が次回起動時に届きます。bunx は GitHub spec を強めにキャッシュするため、bun ユーザーは古いコミットを掴み続けることがあります。
+
+強制リフレッシュ / 特定コミットへの pin:
 
 ```sh
+# bunx のキャッシュを消して次回再取得（PowerShell）
+Remove-Item -Recurse -Force "$env:TEMP\bunx-*ai-log-clean*"
+
+# bunx のキャッシュを消して次回再取得（bash / zsh）
+rm -rf "${TMPDIR:-/tmp}"/bunx-*ai-log-clean*
+
+# 特定コミットを pin（npx / bunx どちらでも同じ書式）
+npx -y 'github:ishizakahiroshi/ai-log-clean#<commit-sha>' install
 bunx 'github:ishizakahiroshi/ai-log-clean#<commit-sha>' install
 ```
+
+トレードオフ: `main` への悪い commit は即配布されます。だからこそ既定挙動を「アーカイブ + `--max-deletes`」にしています。
 
 ## 姉妹プロジェクト
 
