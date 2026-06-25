@@ -8,7 +8,7 @@ fresh public clone でも有効な内容に保つこと。 -->
 
 ai-log-clean は、各 AI コーディング CLI（Claude Code / Codex CLI / GitHub Copilot CLI / Cursor Agent / opencode / Grok）が無期限に貯めるセッションログを、retention（既定 60 日）で日次自動掃除するクロスプラットフォーム CLI ツール。
 
-ターゲットは「いずれかの AI CLI を 1 つ以上使う開発者」。複数併用していなくても役に立つ単独ツールとして提供する。配布は GitHub から直接 `bunx` / `npx` で実行する形を採り、npm registry には publish しない（バージョン切り運用を持たない・main push が即配布）。
+ターゲットは「いずれかの AI CLI を 1 つ以上使う開発者」。複数併用していなくても役に立つ単独ツールとして提供する。配布は GitHub から直接 `npx -y` / `bunx` で実行する形を採り、npm registry には publish しない（バージョン切り運用を持たない・main push が即配布）。**推奨ランナーは `npx -y`**（bunx は GitHub spec のキャッシュが強めで `main` 即配布が成立しないため・詳細は README の「Distribution model / 配布モデル」節）。
 
 姉妹プロジェクト: [many-ai-cli](https://github.com/ishizakahiroshi/many-ai-cli)（複数 AI CLI の並列承認・ダッシュボード）。本リポは独立。
 
@@ -31,7 +31,7 @@ ai-log-clean は、各 AI コーディング CLI（Claude Code / Codex CLI / Git
 | CLI 引数 | `node:util` の `parseArgs`（依存ゼロ） |
 | config | `~/.ai-log-clean/config.toml`（TOML パーサで読む） |
 | OS スケジューラ | Windows=schtasks+wscript.exe+run-hidden.vbs / macOS=launchd / Linux=systemd --user timer |
-| 配布 | GitHub のみ（`bunx github:ishizakahiroshi/ai-log-clean ...` で直接実行） |
+| 配布 | GitHub のみ（`npx -y github:ishizakahiroshi/ai-log-clean ...` で直接実行。bunx も可） |
 
 ## ディレクトリ構成
 
@@ -56,16 +56,18 @@ ai-log-clean/
 
 ユーザー向け（README を参照）:
 
-- 試す: `bunx github:ishizakahiroshi/ai-log-clean --dry-run`
-- 仕掛ける: `bunx github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60`
-- 状況確認: `bunx github:ishizakahiroshi/ai-log-clean status`
-- 止める: `bunx github:ishizakahiroshi/ai-log-clean uninstall`
+- 試す: `npx -y github:ishizakahiroshi/ai-log-clean --dry-run`
+- 仕掛ける: `npx -y github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60`
+- 状況確認: `npx -y github:ishizakahiroshi/ai-log-clean status`
+- 止める: `npx -y github:ishizakahiroshi/ai-log-clean uninstall`
+
+> 推奨ランナーは `npx -y`。bunx は GitHub spec のキャッシュが強めで `main` 即配布が成立しないため、README の「Distribution model / 配布モデル」節に bunx ユーザー向けの cache クリア手順を記載している。
 
 開発者向け:
 
 - ローカルで実行: `node src/cli.mjs --dry-run` または `bun src/cli.mjs --dry-run`
 - secrets-scan 手動実行: `node scripts/secrets-scan.mjs --staged --block`
-- **ビルドステップなし**: `.mjs` を直接配布。`main` に push したら次回 `bunx` 起動で反映される
+- **ビルドステップなし**: `.mjs` を直接配布。`main` に push したら次回 `npx -y` 起動で即反映（bunx は cache のため強制リフレッシュが必要）
 
 ## 運用ルール（このプロジェクト固有）
 
