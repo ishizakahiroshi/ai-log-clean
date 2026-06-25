@@ -6,6 +6,7 @@
  * cutoff, and prunes empty date directories on cleanup.
  */
 
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -15,7 +16,9 @@ export function sessionsDir() {
   return join(homedir(), ".codex", "sessions");
 }
 
-export async function detected() { return false; }
+export async function detected() {
+  return existsSync(sessionsDir());
+}
 export async function scan(_cutoff) { return []; }
 export async function totalSize() { return 0; }
 export async function ageRange() { return {}; }

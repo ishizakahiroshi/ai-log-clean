@@ -9,6 +9,7 @@
  * When enabled, it falls back to mtime-based cleanup of the .jsonl files.
  */
 
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -19,17 +20,8 @@ export function sessionsDir() {
 }
 
 export async function detected() {
-  return false; // TODO
+  return existsSync(sessionsDir());
 }
-
-export async function scan(_cutoff) {
-  return []; // TODO
-}
-
-export async function totalSize() {
-  return 0;
-}
-
-export async function ageRange() {
-  return {};
-}
+export async function scan(_cutoff) { return []; }
+export async function totalSize() { return 0; }
+export async function ageRange() { return {}; }
