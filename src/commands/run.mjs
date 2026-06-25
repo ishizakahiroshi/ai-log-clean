@@ -32,29 +32,59 @@ export async function run(argv) {
   const onlyProvider = values.provider ? String(values.provider) : null;
   const dryRun = Boolean(values["dry-run"]);
 
+  process.stdout.write(
+    `ai-log-clean run (${dryRun ? "dry-run" : cfg.defaults.delete ? "delete" : "archive-only"})\n`,
+  );
+  process.stdout.write(
+    `default retention: ${cfg.defaults.retentionDays}d\n\n`,
+  );
+
   let worstExit = 0;
+  let actedCount = 0;
   for (const provider of PROVIDERS) {
     if (onlyProvider && provider !== onlyProvider) continue;
-    if (!cfg.providers[provider].enabled) continue;
+    const enabled = cfg.providers[provider].enabled;
     const impl = PROVIDER_REGISTRY[provider];
-    if (!(await impl.detected())) continue;
+    const isDetected = await impl.detected();
+
+    if (!enabled) {
+      process.stdout.write(`  ${provider.padEnd(14)}  skipped (disabled in config)\n`);
+      continue;
+    }
+    if (!isDetected) {
+      process.stdout.write(`  ${provider.padEnd(14)}  skipped (no session directory found)\n`);
+      continue;
+    }
 
     const days = effectiveRetentionDays(cfg, provider);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     try {
       const candidates = await impl.scan(cutoff);
       process.stdout.write(
-        `${provider}: retention=${days}d candidates=${candidates.length}${
-          dryRun ? " (dry-run)" : ""
+        `  ${provider.padEnd(14)}  retention=${days}d  candidates=${candidates.length}${
+          dryRun ? "  (dry-run, no changes)" : ""
         }\n`,
       );
+      actedCount++;
       // TODO: per-provider archive / delete with --max-deletes cap.
     } catch (err) {
       worstExit = 1;
       process.stderr.write(
-        `${provider}: failed: ${err instanceof Error ? err.message : String(err)}\n`,
+        `  ${provider.padEnd(14)}  FAILED: ${err instanceof Error ? err.message : String(err)}\n`,
       );
     }
   }
+
+  if (actedCount === 0) {
+    process.stdout.write(
+      `\nNothing to do. No supported AI CLI session directories were found on this machine,\n` +
+        `or every provider is disabled in config. Use 'ai-log-clean list' to inspect state.\n`,
+    );
+  } else {
+    process.stdout.write(
+      `\nDone. ${actedCount} provider(s) processed${dryRun ? " (dry-run, nothing changed)" : ""}.\n`,
+    );
+  }
+
   return worstExit;
 }
