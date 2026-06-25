@@ -1,0 +1,57 @@
+{
+  "name": "ai-log-clean",
+  "version": "0.0.0-dev",
+  "description": "Trim old session logs from Claude Code, Codex CLI, GitHub Copilot CLI, Cursor Agent, opencode, and Grok. Cross-platform daily auto-clean with configurable retention.",
+  "type": "module",
+  "bin": {
+    "ai-log-clean": "./src/cli.ts"
+  },
+  "main": "./src/cli.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "bun run src/cli.ts",
+    "scan": "node scripts/secrets-scan.mjs --staged --block",
+    "scan:all": "node scripts/secrets-scan.mjs --all-tracked --block",
+    "prepare": "husky"
+  },
+  "author": "ishizakahiroshi <ishizakahiroshi.dev@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ishizakahiroshi/ai-log-clean.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ishizakahiroshi/ai-log-clean/issues"
+  },
+  "homepage": "https://github.com/ishizakahiroshi/ai-log-clean#readme",
+  "keywords": [
+    "ai",
+    "cli",
+    "claude-code",
+    "codex",
+    "copilot",
+    "cursor-agent",
+    "opencode",
+    "grok",
+    "log",
+    "cleanup",
+    "retention",
+    "cross-platform"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src/**/*",
+    "assets/**/*",
+    "README.md",
+    "README.ja.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "husky": "^9.0.0",
+    "typescript": "^5.6.0"
+  }
+}
