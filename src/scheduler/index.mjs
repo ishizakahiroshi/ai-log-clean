@@ -8,9 +8,12 @@
  *   - enable()        resume
  *   - status()        report registration + last run
  *
- * Windows: schtasks /Create user task + wscript.exe + run-hidden.vbs
+ * Windows: schtasks /Create user task + wscript.exe + run-hidden.vbs + run.ps1
  * macOS:   ~/Library/LaunchAgents/com.ai-log-clean.plist + launchctl
  * Linux:   ~/.config/systemd/user/ai-log-clean.{service,timer} + systemctl --user
+ *
+ * Scheduled jobs always invoke `npx -y github:ishizakahiroshi/ai-log-clean run ...`
+ * (not bunx — GitHub cache stickiness breaks main-as-release).
  *
  * No administrator / sudo / UAC is required on any OS.
  */
@@ -19,6 +22,11 @@ import { platform } from "node:os";
 import * as windowsImpl from "./windows.mjs";
 import * as macosImpl from "./macos.mjs";
 import * as linuxImpl from "./linux.mjs";
+
+// Re-export so existing `import { notImplementedError } from "./index.mjs"`
+// call sites (if any) keep working. OS modules import from ./errors.mjs
+// directly to avoid a circular dependency with this barrel.
+export { notImplementedError } from "./errors.mjs";
 
 export function currentScheduler() {
   switch (platform()) {
@@ -29,13 +37,4 @@ export function currentScheduler() {
     default:
       return linuxImpl;
   }
-}
-
-/**
- * Shared error factory for scheduler stubs. Keeps the magic string
- * "not implemented" in one place so callers can match on it (e.g. the
- * uninstall command tolerates this specific failure to allow --purge).
- */
-export function notImplementedError(os, method) {
-  return new Error(`scheduler.${os}.${method}: not implemented`);
 }

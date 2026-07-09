@@ -12,9 +12,25 @@ versions.
 ## [Unreleased]
 
 ### Added
+- Full OS schedulers (user-scope, no admin): Windows Task Scheduler +
+  `run-hidden.vbs`/`run.ps1`, macOS LaunchAgent, Linux systemd `--user` timer.
+  Scheduled jobs always invoke `npx -y github:ishizakahiroshi/ai-log-clean run ...`.
+- `status` / `disable` / `enable` / `uninstall` wired to the real OS backends.
+- `install` prompts to bump Claude Code `cleanupPeriodDays` when shorter than
+  retention (`--yes` auto-applies; non-TTY prints a hint).
+- Zero-dependency TOML subset loader for `~/.ai-log-clean/config.toml`.
+- Antigravity CLI (`agy`) provider (`~/.gemini/antigravity-cli/`).
+- Unit tests for config, quarantine safety, CLI routing, scheduler builders,
+  Claude settings merge (Node built-in `node:test`).
+
+### Changed
+- Recommended runner documented as `npx -y` (bunx GitHub cache is sticky).
+- README archive wording matches implementation (no zip compression; empty
+  parent dirs are left in place).
+
+### Added (earlier scaffolding)
 - Initial project scaffolding (CLAUDE.md, AGENTS.md, LICENSE, README, package.json, src/ skeleton).
 - secrets-scan layer 2/3 wiring (husky pre-commit + GitHub Actions backstop).
-- Cross-platform scheduler stubs (Windows / macOS / Linux).
-- Per-provider cleanup stubs for Claude Code, Codex CLI, GitHub Copilot CLI,
+- Per-provider cleanup for Claude Code, Codex CLI, GitHub Copilot CLI,
   Cursor Agent, opencode, and Grok.
 

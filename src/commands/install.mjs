@@ -11,6 +11,7 @@
 
 import { parseArgs } from "node:util";
 import { currentScheduler } from "../scheduler/index.mjs";
+import { maybeBumpCleanupPeriodDays } from "../providers/claude-code-settings.mjs";
 
 export async function run(argv) {
   const { values } = parseArgs({
@@ -26,22 +27,69 @@ export async function run(argv) {
   });
 
   const at = String(values.at);
+  if (!isValidAt(at)) {
+    process.stderr.write(`--at must be HH:MM in 24h clock (got ${JSON.stringify(at)})\n`);
+    return 2;
+  }
   const retentionDays = Number.parseInt(String(values["retention-days"]), 10);
   if (!Number.isFinite(retentionDays) || retentionDays < 1) {
     process.stderr.write(`--retention-days must be a positive integer\n`);
     return 2;
   }
 
-  // TODO: Claude Code cleanupPeriodDays interactive bump (Y/N unless --yes).
+  // Claude Code settings bump (before scheduler so a declined/failed bump
+  // still leaves a consistent message order; scheduler is the heavier step).
+  try {
+    const bump = await maybeBumpCleanupPeriodDays({
+      retentionDays,
+      yes: Boolean(values.yes),
+    });
+    if (bump.action === "updated") {
+      process.stdout.write(
+        `claude: cleanupPeriodDays ${bump.from} → ${bump.to} (wrote ~/.claude/settings.json)\n`,
+      );
+    } else if (bump.action === "declined") {
+      process.stdout.write(
+        `claude: left cleanupPeriodDays=${bump.from} (declined bump to ${bump.to})\n`,
+      );
+    } else if (bump.reason === "non-interactive-without-yes") {
+      process.stdout.write(
+        `claude: cleanupPeriodDays=${bump.from} is shorter than retention=${retentionDays}; re-run with --yes to bump, or edit ~/.claude/settings.json\n`,
+      );
+    }
+    // already-sufficient / no-settings-file: silent
+  } catch (err) {
+    process.stderr.write(
+      `claude: could not update settings.json — ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    // Non-fatal: continue to scheduler install
+  }
 
   const scheduler = currentScheduler();
   await scheduler.install({
-    at,
+    at: normalizeAt(at),
     retentionDays,
     delete: Boolean(values.delete),
     interactive: !values.yes,
   });
 
-  process.stdout.write(`installed: daily at ${at}, retention=${retentionDays}d\n`);
+  process.stdout.write(`installed: daily at ${normalizeAt(at)}, retention=${retentionDays}d\n`);
   return 0;
+}
+
+/** Accept "H:MM" or "HH:MM" with hour 0-23 and minute 0-59. */
+export function isValidAt(at) {
+  const m = String(at).match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return false;
+  const hh = Number.parseInt(m[1], 10);
+  const mm = Number.parseInt(m[2], 10);
+  return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
+}
+
+/** Canonical "HH:MM" form for scheduler registration. */
+export function normalizeAt(at) {
+  const m = String(at).match(/^(\d{1,2}):(\d{2})$/);
+  const hh = Number.parseInt(m[1], 10);
+  const mm = Number.parseInt(m[2], 10);
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }

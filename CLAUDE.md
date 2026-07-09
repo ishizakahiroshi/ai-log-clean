@@ -6,7 +6,7 @@ fresh public clone でも有効な内容に保つこと。 -->
 
 ## プロジェクト概要
 
-ai-log-clean は、各 AI コーディング CLI（Claude Code / Codex CLI / GitHub Copilot CLI / Cursor Agent / opencode / Grok）が無期限に貯めるセッションログを、retention（既定 60 日）で日次自動掃除するクロスプラットフォーム CLI ツール。
+ai-log-clean は、各 AI コーディング CLI（Claude Code / Codex CLI / GitHub Copilot CLI / Cursor Agent / opencode / Grok / Antigravity CLI (`agy`)）が無期限に貯めるセッションログを、retention（既定 60 日）で日次自動掃除するクロスプラットフォーム CLI ツール。
 
 ターゲットは「いずれかの AI CLI を 1 つ以上使う開発者」。複数併用していなくても役に立つ単独ツールとして提供する。配布は GitHub から直接 `npx -y` / `bunx` で実行する形を採り、npm registry には publish しない（バージョン切り運用を持たない・main push が即配布）。**推奨ランナーは `npx -y`**（bunx は GitHub spec のキャッシュが強めで `main` 即配布が成立しないため・詳細は README の「Distribution model / 配布モデル」節）。
 
@@ -40,15 +40,18 @@ ai-log-clean/
 ├─ src/
 │  ├─ cli.mjs                # サブコマンドルーター
 │  ├─ config.mjs             # ~/.ai-log-clean/config.toml の読み書き
-│  ├─ commands/              # サブコマンド本体（install / uninstall / run / list 等）
-│  ├─ providers/             # provider ごとの掃除ロジック（claude-code / codex / copilot / cursor-agent / opencode / grok）
-│  └─ scheduler/             # OS 別スケジューラ登録（windows / macos / linux）
+│  ├─ commands/              # サブコマンド本体（install / uninstall / run / list / status / enable / disable / init）
+│  ├─ providers/             # provider ごとの掃除ロジック（claude-code / codex / copilot / cursor-agent / opencode / grok / antigravity）
+│  ├─ scheduler/             # OS 別スケジューラ登録（windows / macos / linux）
+│  └─ utils/                 # 共有ユーティリティ（fs 等）
+├─ tests/
+│  └─ unit.test.mjs          # node --test で走る unit テスト（CI で 3 OS 実行）
 ├─ assets/
 │  └─ run-hidden.vbs         # Windows 用コンソール非表示 VBS（install 時に展開）
 ├─ scripts/
 │  └─ secrets-scan.mjs       # secrets-scan 層 2/3/4 共通スキャナ
 ├─ .husky/pre-commit         # layer 2 hook
-├─ .github/workflows/        # layer 3 CI (secrets-scan / type-check)
+├─ .github/workflows/        # layer 3 CI (secrets-scan.yml / ci.yml = smoke + unit tests)
 └─ docs/local/               # 非公開ノート（gitignored）
 ```
 
@@ -66,33 +69,30 @@ ai-log-clean/
 開発者向け:
 
 - ローカルで実行: `node src/cli.mjs --dry-run` または `bun src/cli.mjs --dry-run`
+- テスト実行: `node --test tests/unit.test.mjs`
 - secrets-scan 手動実行: `node scripts/secrets-scan.mjs --staged --block`
 - **ビルドステップなし**: `.mjs` を直接配布。`main` に push したら次回 `npx -y` 起動で即反映（bunx は cache のため強制リフレッシュが必要）
 
-## 運用ルール（このプロジェクト固有）
+## AI 作業共通ルール
 
-グローバル `~/.claude/CLAUDE.md` の規約（md 命名・フッター・ビルド/コミット抑制・承認フォーマット等）に従う。加えて ai-log-clean 固有:
+ビルド・コミット禁止、secrets-scan 責務、plan/bugfix/pending md の作成ルール等の AI 作業共通ルールは、各利用者のグローバル AI 設定に従う（作者環境の例: `~/.claude/CLAUDE.md` および `~/.claude/guides/`）。
+
+## 運用ルール（このプロジェクト固有）
 
 - **既定はアーカイブ動作・削除は `--delete` 明示**。サブコマンド・provider 実装はこの原則を必ず満たす（テストで強制する）
 - **install の冪等性**: 2 回目以降の install は確認なしで上書き登録（シンプルさ優先）。確認プロンプトを増やさない
 - **Claude Code 本体の `cleanupPeriodDays`**: 直接書き換えない。install 時に「現在 30 です。60 に変更しますか？ Y/N」と対話確認する。`--yes` で非対話化
 - **管理者権限を要求しない**: 全 OS で user-scope のスケジューラ（schtasks user task / launchd LaunchAgent / systemd --user timer）。UAC / sudo を出さない
 - **Windows でコンソール窓を出さない**: `wscript.exe` + 同梱の `run-hidden.vbs` 経由で起動。終了コードは Task Scheduler に伝搬
-- **本リポジトリへのコミット・ビルド・公開はユーザー指示があるまで実行しない**（house 標準）
 
-## secrets-scan (kb-first・4 層防御の一次防御)
+## secrets-scan（このリポの配線）
 
-公開ファイル（`README*` / `CLAUDE.md` / `AGENTS.md` / `src/**` / `dist/**` / packaged tarball）を新規作成・大改訂する瞬間、以下を AI 自身の責務として実行する:
+層 1 の共通責務（固有名詞の一般化・fixture は合成データ）はグローバル `~/.claude/CLAUDE.md` に従う。本リポ固有:
 
-- 親 plan / 設計メモ / 動作確認ログからの文言転記時、外部 KB の表示名列（`companies.short_name` / `people.name` / `servers.host` / `applications.name`）と family display 名を必ず一般化する（「特定の顧客」「ユーザー」「A 拠点」等）
-- テスト fixture / 例示 / サンプルには動作確認の実値を貼らない（最初から合成データで書く）
-- 不安なら手で `node scripts/secrets-scan.mjs --staged --block` を実行して検証
-
-機械的な層: layer 2 pre-commit hook（husky）/ layer 3 GitHub Actions `secrets-scan.yml` / layer 4 release ゲートが自動で走るが、**書く瞬間の自問が一次防御**。
-
-env (full coverage に必要・未設定なら構造 regex のみで継続): `KB_ROOT` / `FAMILY_ROOT`。設定詳細は `~/.claude/local-accounts.md` または `scripts/secrets-scan.mjs` の冒頭コメント。
-
-参照実装・設計詳細: `worklog-bridge` リポの `docs/local/secrets-scan-design/`（gitignored・公開しない）
+- 手動実行: `node scripts/secrets-scan.mjs --staged --block`
+- 機械層: layer 2 = `.husky/pre-commit`（husky）/ layer 3 = GitHub Actions `secrets-scan.yml` / layer 4 = release ゲート
+- env（full coverage に必要・未設定なら構造 regex のみで継続）: `KB_ROOT` / `FAMILY_ROOT`。設定詳細は `scripts/secrets-scan.mjs` の冒頭コメント
+- 参照実装・設計詳細: `worklog-bridge` リポの `docs/local/secrets-scan-design/`（gitignored・公開しない）
 
 ## 関連ドキュメント
 

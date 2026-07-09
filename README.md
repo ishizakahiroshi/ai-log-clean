@@ -2,7 +2,7 @@
 
 > **Status: early development (pre-0.1).** API and defaults may change without notice. Use `--dry-run` first.
 
-Trim old session logs from Claude Code, Codex CLI, GitHub Copilot CLI, Cursor Agent, opencode, and Grok. Cross-platform daily auto-clean with configurable retention.
+Trim old session logs from Claude Code, Codex CLI, GitHub Copilot CLI, Cursor Agent, opencode, Grok, and Antigravity CLI (Google's `agy`). Cross-platform daily auto-clean with configurable retention.
 
 These AI coding CLIs persist every conversation as a "rollout" / session file under your home directory so they can resume past chats. Most of them have **no built-in retention**, so the files accumulate forever — gigabytes after a few months of heavy use. `ai-log-clean` runs once a day, walks the session directories of every supported provider, and **archives** anything older than the configured retention (default 60 days). Actual deletion only happens when you pass `--delete`.
 
@@ -50,11 +50,12 @@ invocation, so a fix on `main` reaches you on the next run. `-y` skips the
 | Provider | Session files | Built-in retention | What ai-log-clean does |
 | --- | --- | --- | --- |
 | Claude Code | `~/.claude/projects/<encoded-cwd>/*.jsonl` | Yes (`cleanupPeriodDays`, default 30 days) | Defers to Claude Code. On `install` we'll ask whether to bump `cleanupPeriodDays` to match your chosen retention; we won't touch `settings.json` without a Y/N confirmation. |
-| Codex CLI | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | No ([openai/codex#6015](https://github.com/openai/codex/issues/6015)) | Archive (or `--delete`) by mtime. Empty date directories are pruned. |
+| Codex CLI | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | No ([openai/codex#6015](https://github.com/openai/codex/issues/6015)) | Archive (or `--delete`) by mtime. Empty date directories are left in place (tiny; reclaimed when Codex writes a new day). |
 | GitHub Copilot CLI | `~/.copilot/logs/process-*.log`, `~/.copilot/session-state/<uuid>/` | No | Per-file for logs, per-session-directory for `session-state/`. |
-| Cursor Agent | `~/.cursor/chats/<hash>/<uuid>/` | No | Per-session-directory; empty hash directories are pruned afterwards. |
+| Cursor Agent | `~/.cursor/chats/<hash>/<uuid>/` | No | Per-session-directory (two-level nesting). Empty parent hash directories are left in place. |
 | opencode | `$XDG_DATA_HOME/opencode/log/*.log`, `.../storage/session_diff/*.json` | No | Per-file. XDG path is resolved per OS (`~/.local/share/`, `~/Library/Application Support/`, `%APPDATA%`). |
 | Grok | `~/.grok/sessions/<encoded>/<uuid>/` | No | Per-session-directory. `~/.grok/logs/unified.jsonl` is **excluded** because it is append-only — pruning it mid-stream would corrupt the journal. |
+| Antigravity CLI (`agy`) | `~/.gemini/antigravity-cli/brain/<id>/`, `.../conversations/<id>.db*`, `.../log/cli-*.log` | No | Per-session-directory for `brain/<id>/`; SQLite triple (`.db` / `.db-shm` / `.db-wal`) archived as one group by max mtime; CLI logs per-file. `bin/`, `builtin/`, `cache/`, `knowledge/`, `settings.json`, `history.jsonl` are left alone. The old `gemini` CLI was discontinued on 2026-06-18 and is **not** handled — Antigravity is its successor and reuses `~/.gemini/`. |
 
 You can disable any provider or set per-provider retention in `~/.ai-log-clean/config.toml` (`npx -y github:ishizakahiroshi/ai-log-clean init` writes a template).
 
@@ -62,7 +63,7 @@ You can disable any provider or set per-provider retention in `~/.ai-log-clean/c
 
 This tool deletes files for a living, so the default is conservative.
 
-- **Default is archive-only.** Files past their retention are moved into `~/.ai-log-clean/quarantine/<YYYY-MM-DD>/` and compressed. Quarantine entries are removed after 30 days.
+- **Default is archive-only.** Files past their retention are moved into `~/.ai-log-clean/quarantine/<YYYY-MM-DD>/` (directory layout preserved; no compression). Quarantine entries older than 30 days are removed at the start of each non-dry-run.
 - **Real deletion requires `--delete`.** Pass it on the CLI, or set `defaults.delete = true` in `config.toml`.
 - **`--dry-run` prints the plan** without touching anything.
 - **`--max-deletes N`** caps a single run at N file or directory removals — a runaway bug can only damage a bounded number of items.
@@ -97,6 +98,9 @@ enabled = true
 [providers.grok]
 enabled       = true
 exclude_files = ["logs/unified.jsonl"]
+
+[providers.antigravity]
+enabled = true
 ```
 
 `npx -y github:ishizakahiroshi/ai-log-clean init` writes this template to `~/.ai-log-clean/config.toml`.

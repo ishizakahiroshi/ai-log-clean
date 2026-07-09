@@ -18,7 +18,7 @@ import { parseArgs } from "node:util";
 import { readdir, stat } from "node:fs/promises";
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, relative } from "node:path";
 
 import {
   loadConfig,
@@ -34,6 +34,20 @@ import {
   formatSize,
   todayStamp,
 } from "../utils/fs.mjs";
+
+/**
+ * Drop candidates whose path (relative to their source root) matches an
+ * entry in the provider's `exclude_files` list. Matching is by exact
+ * relative path with `\` normalized to `/`, so config stays portable.
+ */
+export function applyExcludeFiles(candidates, excludeFiles) {
+  if (!excludeFiles || excludeFiles.length === 0) return candidates;
+  const excluded = new Set(excludeFiles.map((e) => String(e).replace(/\\/g, "/")));
+  return candidates.filter((c) => {
+    const rel = relative(c.root, c.path).replace(/\\/g, "/");
+    return !excluded.has(rel);
+  });
+}
 
 const QUARANTINE_RETENTION_DAYS = 30;
 
@@ -161,7 +175,11 @@ export async function run(argv) {
     const days = effectiveRetentionDays(cfg, provider);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     try {
-      const candidates = await impl.scan(cutoff);
+      const rawCandidates = await impl.scan(cutoff);
+      const candidates = applyExcludeFiles(
+        rawCandidates,
+        cfg.providers[provider].excludeFiles,
+      );
       const candidateSize = candidates.reduce((a, c) => a + c.size, 0);
       let acted = 0;
       let bytesActed = 0;
@@ -185,10 +203,17 @@ export async function run(argv) {
             bytesActed += c.size;
             remainingBudget--;
           } catch (err) {
+            // Per-item failure must surface as a non-zero exit so a
+            // scheduled run does not look "clean" when it silently
+            // skipped half the candidates (e.g. permission / EXDEV).
+            worstExit = 1;
             // Mask the full path: log only the basename + kind so a captured
             // stderr does not leak the absolute project / session layout.
+            // Prefer err.message only when it has no absolute-looking path
+            // fragments; otherwise fall back to err.code / a short label.
+            const msg = sanitizeErrorMessage(err);
             process.stderr.write(
-              `    ${provider}: ${c.kind} ${basename(c.path)} — ${err instanceof Error ? err.message : String(err)}\n`,
+              `    ${provider}: ${c.kind} ${basename(c.path)} — ${msg}\n`,
             );
           }
         }
@@ -228,4 +253,24 @@ export async function run(argv) {
   }
 
   return worstExit;
+}
+
+/**
+ * Strip absolute-path-looking segments from an error message so scheduler
+ * logs do not reveal home-directory layout. Keeps short codes / reasons.
+ */
+function sanitizeErrorMessage(err) {
+  if (!(err instanceof Error)) return String(err);
+  // Prefer Node's errno code when present (EPERM, EXDEV, ENOENT, ...).
+  if (err.code && typeof err.code === "string") {
+    return err.code + (err.message && !looksLikeAbsPath(err.message) ? `: ${err.message}` : "");
+  }
+  if (looksLikeAbsPath(err.message)) return "operation failed";
+  return err.message || "operation failed";
+}
+
+function looksLikeAbsPath(s) {
+  if (!s) return false;
+  // Windows drive letter, UNC, or POSIX absolute home/root paths.
+  return /(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|root|var|tmp|private)\b)/.test(s);
 }

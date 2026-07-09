@@ -26,12 +26,19 @@ import {
   defaultConfig,
   effectiveRetentionDays,
   validateConfigShape,
+  parseConfigToml,
+  mergeConfig,
+  CONFIG_TEMPLATE,
 } from "../src/config.mjs";
 import {
   formatSize,
   todayStamp,
   moveToQuarantine,
 } from "../src/utils/fs.mjs";
+import { findSubcommandIndex } from "../src/cli.mjs";
+import { applyExcludeFiles } from "../src/commands/run.mjs";
+import { isValidAt, normalizeAt } from "../src/commands/install.mjs";
+import { conversationGroupKey } from "../src/providers/antigravity.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = dirname(here);
@@ -170,4 +177,268 @@ test("quarantine layout sanity: archived file lives under quarantineRoot/today/p
   const entries = await readdir(dayDir, { recursive: true });
   assert.ok(entries.length >= 1);
   assert.ok(target.startsWith(dayDir), `target should be under ${dayDir}, got ${target}`);
+});
+
+test("moveToQuarantine: path-traversal error message does not embed absolute paths", async () => {
+  const root = await mkdtemp(join(tmpdir(), "alc-test-"));
+  const sourceRoot = join(root, "sessions");
+  const quarantineRoot = join(root, "quarantine");
+  await mkdir(sourceRoot, { recursive: true });
+  const outside = join(root, "elsewhere.txt");
+  await writeFile(outside, "hi");
+  try {
+    await moveToQuarantine({
+      source: outside,
+      sourceRoot,
+      provider: "codex",
+      quarantineRoot,
+      today: "2026-06-25",
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /not inside sourceRoot/);
+    // Must not leak the absolute source path (drive letter or home-style root).
+    assert.equal(
+      /[A-Za-z]:[\\/]|\/(?:Users|home)\b/.test(err.message),
+      false,
+      `error leaked an absolute path: ${err.message}`,
+    );
+  }
+});
+
+test("parseConfigToml + mergeConfig: reads defaults and per-provider overrides", () => {
+  const partial = parseConfigToml(`
+# comment
+[defaults]
+retention_days = 30
+delete = true
+
+[providers.codex]
+enabled = false
+retention_days = 7
+exclude_files = ["a/b.jsonl", "c.jsonl"]
+
+[providers.unknown_future]
+enabled = false
+`);
+  assert.equal(partial.defaults.retentionDays, 30);
+  assert.equal(partial.defaults.delete, true);
+  assert.equal(partial.providers.codex.enabled, false);
+  assert.equal(partial.providers.codex.retentionDays, 7);
+  assert.deepEqual(partial.providers.codex.excludeFiles, ["a/b.jsonl", "c.jsonl"]);
+
+  const cfg = mergeConfig(defaultConfig(), partial);
+  assert.equal(cfg.defaults.retentionDays, 30);
+  assert.equal(cfg.defaults.delete, true);
+  assert.equal(cfg.providers.codex.enabled, false);
+  assert.equal(cfg.providers.codex.retentionDays, 7);
+  // unknown_future is not a known PROVIDER — ignored, no new key
+  assert.equal(cfg.providers.unknown_future, undefined);
+  validateConfigShape(cfg);
+});
+
+test("parseConfigToml: CONFIG_TEMPLATE round-trips into a valid shape", () => {
+  const partial = parseConfigToml(CONFIG_TEMPLATE);
+  const cfg = mergeConfig(defaultConfig(), partial);
+  validateConfigShape(cfg);
+  assert.equal(cfg.providers.claude_code.enabled, false);
+  assert.equal(cfg.providers.antigravity.enabled, true);
+  assert.deepEqual(cfg.providers.grok.excludeFiles, ["logs/unified.jsonl"]);
+});
+
+test("parseConfigToml: rejects bad types", () => {
+  assert.throws(() => parseConfigToml("[defaults]\nretention_days = true\n"), /integer/);
+  assert.throws(() => parseConfigToml("[defaults]\ndelete = yes\n"), /true\/false/);
+  assert.throws(() => parseConfigToml("[defaults]\nretention_days = abc\n"), /integer/);
+});
+
+test("findSubcommandIndex: does not treat option values as subcommands", () => {
+  // Regression: `ai-log-clean --provider list` used to route to `list`.
+  assert.equal(findSubcommandIndex(["--provider", "list"]), -1);
+  assert.equal(findSubcommandIndex(["--provider", "run"]), -1);
+  assert.equal(findSubcommandIndex(["--retention-days", "30"]), -1);
+  assert.equal(findSubcommandIndex(["--at", "12:00"]), -1);
+  // Real subcommands still resolve (including after flags).
+  assert.equal(findSubcommandIndex(["list"]), 0);
+  assert.equal(findSubcommandIndex(["--yes", "install", "--at", "12:00"]), 1);
+  assert.equal(findSubcommandIndex(["run", "--provider", "list"]), 0);
+  // --key=value form
+  assert.equal(findSubcommandIndex(["--provider=list"]), -1);
+  assert.equal(findSubcommandIndex(["--provider=codex", "status"]), 1);
+});
+
+test("applyExcludeFiles: drops matching relative paths", () => {
+  // Synthetic paths only — no real home-dir prefixes (secrets-scan).
+  const candidates = [
+    { path: "/tmp/alc-fixture/.grok/sessions/a", root: "/tmp/alc-fixture/.grok/sessions", size: 1 },
+    { path: "/tmp/alc-fixture/.grok/logs/unified.jsonl", root: "/tmp/alc-fixture/.grok", size: 2 },
+  ];
+  const kept = applyExcludeFiles(candidates, ["logs/unified.jsonl"]);
+  assert.equal(kept.length, 1);
+  assert.equal(kept[0].path, "/tmp/alc-fixture/.grok/sessions/a");
+  // empty exclude keeps all
+  assert.equal(applyExcludeFiles(candidates, []).length, 2);
+  assert.equal(applyExcludeFiles(candidates, undefined).length, 2);
+});
+
+test("isValidAt / normalizeAt: 24h clock bounds", () => {
+  assert.equal(isValidAt("12:00"), true);
+  assert.equal(isValidAt("0:00"), true);
+  assert.equal(isValidAt("23:59"), true);
+  assert.equal(isValidAt("9:05"), true);
+  assert.equal(isValidAt("24:00"), false);
+  assert.equal(isValidAt("12:60"), false);
+  assert.equal(isValidAt("99:99"), false);
+  assert.equal(isValidAt("noon"), false);
+  assert.equal(isValidAt("12"), false);
+  assert.equal(normalizeAt("9:05"), "09:05");
+  assert.equal(normalizeAt("12:00"), "12:00");
+});
+
+test("conversationGroupKey: maps SQLite triple to the .db basename", () => {
+  assert.equal(conversationGroupKey("/x/foo.db"), "foo.db");
+  assert.equal(conversationGroupKey("/x/foo.db-shm"), "foo.db");
+  assert.equal(conversationGroupKey("/x/foo.db-wal"), "foo.db");
+  assert.equal(conversationGroupKey("/x/cli-2026.log"), null);
+  assert.equal(conversationGroupKey("/x/foo.txt"), null);
+});
+
+test("buildNpxRunArgs: always uses npx -y github spec (no bunx)", async () => {
+  const { buildNpxRunArgs, GITHUB_SPEC, buildWindowsRunPs1, buildLaunchAgentPlist, buildSystemdUnits, systemdQuote, parseAt } =
+    await import("../src/scheduler/common.mjs");
+  const args = buildNpxRunArgs({ retentionDays: 60 });
+  assert.deepEqual(args, ["-y", GITHUB_SPEC, "run", "--retention-days", "60"]);
+  assert.ok(args.includes("-y"));
+  assert.ok(!args.some((a) => /bunx/i.test(a)));
+  const withDel = buildNpxRunArgs({ retentionDays: 30, delete: true });
+  assert.ok(withDel.includes("--delete"));
+
+  const ps1 = buildWindowsRunPs1({
+    npxPath: "C:\\Program Files\\nodejs\\npx.cmd",
+    retentionDays: 60,
+    delete: false,
+  });
+  assert.match(ps1, /npx\.cmd/);
+  assert.match(ps1, /github:ishizakahiroshi\/ai-log-clean/);
+  assert.match(ps1, /--retention-days/);
+  assert.equal(ps1.includes("bunx"), false);
+
+  const plist = buildLaunchAgentPlist({
+    label: "com.ai-log-clean",
+    npxPath: "/usr/local/bin/npx",
+    retentionDays: 60,
+    delete: false,
+    at: "12:00",
+    logPath: "/tmp/alc-fixture/cleanup.log",
+  });
+  assert.match(plist, /StartCalendarInterval/);
+  assert.match(plist, /<integer>12<\/integer>/);
+  assert.match(plist, /github:ishizakahiroshi\/ai-log-clean/);
+
+  const { service, timer } = buildSystemdUnits({
+    unitName: "ai-log-clean",
+    npxPath: "/usr/bin/npx",
+    retentionDays: 45,
+    delete: true,
+    at: "09:30",
+  });
+  assert.match(service, /Type=oneshot/);
+  assert.match(service, /--delete/);
+  assert.match(timer, /OnCalendar=\*-\*-\* 09:30:00/);
+  assert.equal(parseAt("7:05").hour, 7);
+  assert.equal(parseAt("7:05").minute, 5);
+  assert.equal(systemdQuote("simple"), "simple");
+  assert.match(systemdQuote("a b"), /"/);
+});
+
+test("buildTaskXml: daily trigger + wscript action", async () => {
+  const { buildTaskXml } = await import("../src/scheduler/windows.mjs");
+  const xml = buildTaskXml({
+    wscript: "C:\\Windows\\System32\\wscript.exe",
+    vbsPath: "C:\\tmp\\alc\\run-hidden.vbs",
+    ps1Path: "C:\\tmp\\alc\\run.ps1",
+    at: "12:00",
+  });
+  assert.match(xml, /ScheduleByDay/);
+  assert.match(xml, /wscript\.exe/);
+  assert.match(xml, /run-hidden\.vbs/);
+  assert.match(xml, /run\.ps1/);
+  assert.match(xml, /T12:00:00/);
+});
+
+test("systemdUsecToDate: parses usec and rejects n/a", async () => {
+  const { systemdUsecToDate } = await import("../src/scheduler/linux.mjs");
+  assert.equal(systemdUsecToDate("n/a"), null);
+  assert.equal(systemdUsecToDate("0"), null);
+  const d = systemdUsecToDate("1609459200000000"); // 2021-01-01T00:00:00Z
+  assert.ok(d instanceof Date);
+  assert.equal(d.toISOString().startsWith("2021-01-01"), true);
+});
+
+test("tryParseDate + normalizeSchtasksLastResult: ja-JP schtasks forms", async () => {
+  const { tryParseDate, normalizeSchtasksLastResult } = await import(
+    "../src/scheduler/common.mjs"
+  );
+  const next = tryParseDate("2026/07/10 金 12:00:00");
+  assert.ok(next instanceof Date);
+  assert.equal(next.getFullYear(), 2026);
+  assert.equal(next.getMonth(), 6);
+  assert.equal(next.getDate(), 10);
+  assert.equal(next.getHours(), 12);
+  assert.equal(normalizeSchtasksLastResult("267011"), null); // HAS_NOT_RUN
+  assert.equal(normalizeSchtasksLastResult("0"), 0);
+  assert.equal(normalizeSchtasksLastResult("1"), 1);
+  assert.equal(tryParseDate("N/A"), null);
+});
+
+test("maybeBumpCleanupPeriodDays: updates / declines / skips correctly", async () => {
+  const { maybeBumpCleanupPeriodDays, readClaudeSettings } = await import(
+    "../src/providers/claude-code-settings.mjs"
+  );
+  const root = await mkdtemp(join(tmpdir(), "alc-claude-"));
+  const settingsPath = join(root, "settings.json");
+  await writeFile(settingsPath, JSON.stringify({ cleanupPeriodDays: 30, other: true }, null, 2));
+
+  // --yes bumps
+  const updated = await maybeBumpCleanupPeriodDays({
+    retentionDays: 60,
+    yes: true,
+    settingsPath,
+  });
+  assert.equal(updated.action, "updated");
+  assert.equal(updated.from, 30);
+  assert.equal(updated.to, 60);
+  const after = await readClaudeSettings(settingsPath);
+  assert.equal(after.cleanupPeriodDays, 60);
+  assert.equal(after.settings.other, true, "unrelated keys must be preserved");
+
+  // already sufficient
+  const skip = await maybeBumpCleanupPeriodDays({
+    retentionDays: 60,
+    yes: true,
+    settingsPath,
+  });
+  assert.equal(skip.action, "skipped");
+  assert.equal(skip.reason, "already-sufficient");
+
+  // decline via ask
+  await writeFile(settingsPath, JSON.stringify({ cleanupPeriodDays: 20 }, null, 2));
+  const declined = await maybeBumpCleanupPeriodDays({
+    retentionDays: 60,
+    yes: false,
+    settingsPath,
+    ask: async () => "n",
+  });
+  assert.equal(declined.action, "declined");
+  const still = await readClaudeSettings(settingsPath);
+  assert.equal(still.cleanupPeriodDays, 20);
+
+  // missing file
+  const missing = await maybeBumpCleanupPeriodDays({
+    retentionDays: 60,
+    yes: true,
+    settingsPath: join(root, "nope.json"),
+  });
+  assert.equal(missing.action, "skipped");
+  assert.equal(missing.reason, "no-settings-file");
 });

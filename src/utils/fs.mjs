@@ -118,8 +118,11 @@ export async function safeStat(path) {
 export async function moveToQuarantine({ source, sourceRoot, provider, quarantineRoot, today }) {
   const rel = relative(sourceRoot, source);
   if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    // Do not embed absolute paths: captured stderr (scheduler logs) must
+    // not leak the user's home/session layout. Relative form is enough
+    // to debug a provider bug.
     throw new Error(
-      `refusing to quarantine: source ${JSON.stringify(source)} is not inside sourceRoot ${JSON.stringify(sourceRoot)}`,
+      `refusing to quarantine: source is not inside sourceRoot (rel=${JSON.stringify(rel)})`,
     );
   }
   const baseTarget = join(quarantineRoot, today, provider, rel);

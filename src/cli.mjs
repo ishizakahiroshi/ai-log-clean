@@ -7,7 +7,14 @@
  * top-level deliberately does NOT use parseArgs for subcommand option
  * parsing, because parseArgs would consume `--retention-days` etc. before
  * the subcommand sees them.
+ *
+ * Side-effect note: `main()` only runs when this file is the process entry
+ * point. Importing helpers (e.g. `findSubcommandIndex`) from unit tests
+ * must not invoke the router or call `process.exit`.
  */
+
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const SUBCOMMANDS = {
   install: (rest) => import("./commands/install.mjs").then((m) => m.run(rest)),
@@ -56,6 +63,47 @@ Examples:
 Documentation: https://github.com/ishizakahiroshi/ai-log-clean
 `;
 
+/**
+ * Options that consume the next argv token as a value. Used so that a
+ * value like `list` after `--provider list` is not mistaken for the
+ * `list` subcommand (which used to hijack `ai-log-clean --provider list`
+ * into the list command entirely).
+ */
+const OPTIONS_WITH_VALUE = new Set([
+  "--at",
+  "--retention-days",
+  "--provider",
+  "--max-deletes",
+]);
+
+/**
+ * Return the index of the first *positional* subcommand name, skipping
+ * option flags and their values. Returns -1 when no subcommand is present
+ * (caller treats that as the `run` shorthand).
+ */
+export function findSubcommandIndex(argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--") return -1;
+    if (a.startsWith("-")) {
+      // --key=value already includes its value
+      if (a.includes("=")) continue;
+      if (OPTIONS_WITH_VALUE.has(a)) {
+        // skip the following value token when it is not another flag
+        if (i + 1 < argv.length && !argv[i + 1].startsWith("-")) i++;
+      }
+      continue;
+    }
+    // first positional argument
+    if (Object.prototype.hasOwnProperty.call(SUBCOMMANDS, a)) {
+      return i;
+    }
+    // unknown positional — not a subcommand
+    return -1;
+  }
+  return -1;
+}
+
 async function main(argv) {
   if (argv.includes("--help") || argv.includes("-h")) {
     process.stdout.write(USAGE);
@@ -66,11 +114,7 @@ async function main(argv) {
     return 0;
   }
 
-  // Find the first known subcommand name. Anything else (including stray
-  // values like '30' after '--retention-days 30') passes through.
-  const subIdx = argv.findIndex((a) =>
-    Object.prototype.hasOwnProperty.call(SUBCOMMANDS, a),
-  );
+  const subIdx = findSubcommandIndex(argv);
 
   if (subIdx === -1) {
     // No explicit subcommand. Treat as `run` shorthand if any flag is present;
@@ -95,4 +139,16 @@ async function main(argv) {
   }
 }
 
-main(process.argv.slice(2)).then((code) => process.exit(code));
+function isDirectRun() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === pathToFileURL(resolve(entry)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectRun()) {
+  main(process.argv.slice(2)).then((code) => process.exit(code ?? 0));
+}

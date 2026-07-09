@@ -1,7 +1,7 @@
 {
   "name": "ai-log-clean",
   "version": "0.0.0-dev",
-  "description": "Trim old session logs from Claude Code, Codex CLI, GitHub Copilot CLI, Cursor Agent, opencode, and Grok. Cross-platform daily auto-clean with configurable retention.",
+  "description": "Trim old session logs from Claude Code, Codex CLI, GitHub Copilot CLI, Cursor Agent, opencode, Grok, and Antigravity CLI. Cross-platform daily auto-clean with configurable retention.",
   "type": "module",
   "bin": {
     "ai-log-clean": "./src/cli.mjs"
@@ -33,6 +33,7 @@
     "cursor-agent",
     "opencode",
     "grok",
+    "antigravity",
     "log",
     "cleanup",
     "retention",
