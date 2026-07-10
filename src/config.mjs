@@ -5,6 +5,7 @@
  *
  *   [defaults]
  *   retention_days = 60
+ *   budget_bytes   = "2GB"               # optional capacity limit
  *   delete         = false
  *
  *   [providers.<name>]
@@ -21,6 +22,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { parseByteSize } from "./utils/budget.mjs";
 
 export const PROVIDERS = [
   "claude_code",
@@ -41,6 +43,7 @@ export function defaultConfig() {
   return {
     defaults: {
       retentionDays: 60,
+      budgetBytes: null,
       delete: false,
     },
     providers: {
@@ -67,7 +70,7 @@ export function effectiveRetentionDays(cfg, provider) {
  * Supported:
  *   - `#` line comments and trailing comments
  *   - `[defaults]`, `[providers.<name>]` section headers
- *   - keys: retention_days (int), delete (bool), enabled (bool),
+ *   - keys: retention_days (int), budget_bytes (int/string), delete (bool), enabled (bool),
  *           exclude_files (array of strings)
  *   - values: bare integers, true/false, "double-quoted" strings,
  *             ["a", "b"] string arrays
@@ -115,6 +118,8 @@ export function parseConfigToml(text) {
     if (section === "defaults") {
       if (key === "retention_days") {
         partial.defaults.retentionDays = parseTomlInt(raw, lineNo);
+      } else if (key === "budget_bytes") {
+        partial.defaults.budgetBytes = parseTomlByteSize(raw, lineNo);
       } else if (key === "delete") {
         partial.defaults.delete = parseTomlBool(raw, lineNo);
       }
@@ -164,6 +169,15 @@ function parseTomlBool(raw, lineNo) {
   throw new Error(`line ${lineNo}: expected true/false, got ${JSON.stringify(raw)}`);
 }
 
+function parseTomlByteSize(raw, lineNo) {
+  try {
+    const value = raw.startsWith('"') ? parseTomlString(raw, lineNo) : parseTomlInt(raw, lineNo);
+    return parseByteSize(value);
+  } catch (err) {
+    throw new Error(`line ${lineNo}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 function parseTomlString(raw, lineNo) {
   if (!(raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2)) {
     throw new Error(`line ${lineNo}: expected "string", got ${JSON.stringify(raw)}`);
@@ -206,6 +220,9 @@ export function mergeConfig(base, partial) {
   if (partial.defaults) {
     if (typeof partial.defaults.retentionDays === "number") {
       base.defaults.retentionDays = partial.defaults.retentionDays;
+    }
+    if (typeof partial.defaults.budgetBytes === "number") {
+      base.defaults.budgetBytes = partial.defaults.budgetBytes;
     }
     if (typeof partial.defaults.delete === "boolean") {
       base.defaults.delete = partial.defaults.delete;
@@ -255,6 +272,12 @@ export async function loadConfig() {
       `config.toml: defaults.retention_days must be a positive integer (got ${cfg.defaults.retentionDays})`,
     );
   }
+  if (cfg.defaults.budgetBytes !== null &&
+      (!Number.isSafeInteger(cfg.defaults.budgetBytes) || cfg.defaults.budgetBytes < 0)) {
+    throw new Error(
+      `config.toml: defaults.budget_bytes must be a non-negative safe integer (got ${cfg.defaults.budgetBytes})`,
+    );
+  }
   for (const name of PROVIDERS) {
     const d = cfg.providers[name].retentionDays;
     if (d !== undefined && (!Number.isFinite(d) || d < 1)) {
@@ -284,6 +307,10 @@ export function validateConfigShape(cfg) {
   if (typeof cfg.defaults.delete !== "boolean") {
     throw new Error("loadConfig: missing defaults.delete");
   }
+  if (cfg.defaults.budgetBytes !== null &&
+      (!Number.isSafeInteger(cfg.defaults.budgetBytes) || cfg.defaults.budgetBytes < 0)) {
+    throw new Error("loadConfig: defaults.budgetBytes must be null or a non-negative safe integer");
+  }
   if (!cfg.providers || typeof cfg.providers !== "object") {
     throw new Error("loadConfig: missing providers");
   }
@@ -300,6 +327,7 @@ export const CONFIG_TEMPLATE = `# ai-log-clean config
 
 [defaults]
 retention_days = 60
+# budget_bytes = "2GB"  # optional capacity limit; unset means retention only
 delete         = false   # archive by default; set true (or pass --delete) to remove
 
 [providers.claude_code]

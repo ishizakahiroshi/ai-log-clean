@@ -31,4 +31,5 @@ jobs:
         with:
           node-version: '20'
       - name: Run unit tests
-        run: node --test tests/unit.test.mjs
+        shell: bash
+        run: node --test tests/*.test.mjs

@@ -15,10 +15,8 @@
  */
 
 import { parseArgs } from "node:util";
-import { readdir, stat } from "node:fs/promises";
 import { mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { join, basename, relative } from "node:path";
+import { basename, relative } from "node:path";
 
 import {
   loadConfig,
@@ -34,6 +32,16 @@ import {
   formatSize,
   todayStamp,
 } from "../utils/fs.mjs";
+import { formatProviderError } from "../utils/errors.mjs";
+import { printDivider, isPrettyStdout } from "../utils/output.mjs";
+import { writeLastRun } from "../utils/last-run.mjs";
+import { appendHistory } from "../utils/last-run.mjs";
+import { QUARANTINE_RETENTION_DAYS, pruneQuarantine } from "../utils/quarantine.mjs";
+import {
+  budgetCandidateKey,
+  parseByteSize,
+  selectBudgetCandidates,
+} from "../utils/budget.mjs";
 
 /**
  * Drop candidates whose path (relative to their source root) matches an
@@ -49,39 +57,95 @@ export function applyExcludeFiles(candidates, excludeFiles) {
   });
 }
 
-const QUARANTINE_RETENTION_DAYS = 30;
-
-async function pruneQuarantine() {
-  if (!existsSync(QUARANTINE_DIR)) return { removed: 0, failed: 0 };
-  const cutoff = Date.now() - QUARANTINE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-  let removed = 0;
-  let failed = 0;
-  let entries;
-  try {
-    entries = await readdir(QUARANTINE_DIR, { withFileTypes: true });
-  } catch (err) {
-    process.stderr.write(
-      `  quarantine prune: cannot read ${QUARANTINE_DIR} — ${err instanceof Error ? err.message : String(err)}\n`,
-    );
-    return { removed: 0, failed: 1 };
+/**
+ * Cross-provider end-of-run summary (testable pure string).
+ *
+ * @param {{
+ *   byProvider: Record<string, { files: number, bytes: number, action: string }>,
+ *   dryRun: boolean,
+ *   deleteMode: boolean,
+ *   maxDeletes: number,
+ *   capped?: boolean,
+ *   budget?: { budgetBytes: number, totalBytes: number, afterBytes: number },
+ *   pretty?: boolean,
+ * }} opts
+ * @returns {string}
+ */
+export function formatRunReport({
+  byProvider,
+  dryRun,
+  deleteMode,
+  maxDeletes,
+  capped = false,
+  budget = null,
+  pretty = false,
+}) {
+  const entries = Object.entries(byProvider || {}).filter(
+    ([, v]) => v && (v.files > 0 || v.bytes > 0),
+  );
+  let totalFiles = 0;
+  let totalBytes = 0;
+  for (const [, v] of entries) {
+    totalFiles += Number(v.files) || 0;
+    totalBytes += Number(v.bytes) || 0;
   }
-  for (const e of entries) {
-    if (!e.isDirectory()) continue;
-    const full = join(QUARANTINE_DIR, e.name);
-    try {
-      const s = await stat(full);
-      if (s.mtimeMs < cutoff) {
-        await removePath(full);
-        removed++;
-      }
-    } catch (err) {
-      failed++;
-      process.stderr.write(
-        `  quarantine prune: failed on ${e.name} — ${err instanceof Error ? err.message : String(err)}\n`,
-      );
+
+  const chunks = [];
+  const pushDivider = (label) => {
+    let captured = "";
+    printDivider(label, {
+      pretty,
+      write: (s) => {
+        captured += s;
+      },
+    });
+    chunks.push(captured);
+  };
+
+  pushDivider("Plan");
+  if (entries.length === 0) {
+    chunks.push("  (no candidates)\n");
+  } else {
+    for (const [name, v] of entries) {
+      const action = String(v.action || (deleteMode ? "delete" : "archive")).padEnd(9);
+      const files = `${Number(v.files) || 0} files`.padStart(12);
+      const size = formatSize(Number(v.bytes) || 0).padStart(10);
+      chunks.push(`  ${name.padEnd(14)}  ${action}  ${files}  ${size}\n`);
     }
   }
-  return { removed, failed };
+  pushDivider();
+
+  if (totalFiles === 0 && totalBytes === 0) {
+    chunks.push("  Nothing to free.\n");
+  } else if (dryRun) {
+    const dest = deleteMode ? "delete in place" : "archive → quarantine";
+    chunks.push(`  Would free ~${formatSize(totalBytes)}  (${dest})\n`);
+  } else if (deleteMode) {
+    chunks.push(`  Freed ${formatSize(totalBytes)} · deleted in place\n`);
+  } else {
+    chunks.push(
+      `  Freed ${formatSize(totalBytes)} · quarantine kept ~${QUARANTINE_RETENTION_DAYS}d\n`,
+    );
+  }
+
+  const maxLabel = Number.isFinite(maxDeletes) ? String(maxDeletes) : "∞";
+  let modeLine = `  mode: ${dryRun ? "dry-run" : "run"} · delete=${deleteMode ? "true" : "false"} · max-deletes=${maxLabel}`;
+  if (capped) modeLine += " · capped";
+  chunks.push(`${modeLine}\n`);
+
+  if (budget) {
+    const verb = dryRun ? "would free" : "freed";
+    chunks.push(
+      `  budget: ${formatSize(budget.budgetBytes)} · now ${formatSize(budget.totalBytes)} · ${verb} ${formatSize(totalBytes)} · after ~${formatSize(budget.afterBytes)}\n`,
+    );
+    chunks.push("  budget scope: enabled + detected providers only\n");
+  }
+
+  if (dryRun) {
+    chunks.push("\nNo files touched.\n");
+  }
+
+  return chunks.join("");
 }
 
 export async function run(argv) {
@@ -91,6 +155,8 @@ export async function run(argv) {
       "dry-run": { type: "boolean", default: false },
       delete: { type: "boolean", default: false },
       "retention-days": { type: "string" },
+      budget: { type: "string" },
+      json: { type: "boolean", default: false },
       provider: { type: "string" },
       "max-deletes": { type: "string" },
     },
@@ -106,6 +172,14 @@ export async function run(argv) {
       return 2;
     }
     cfg.defaults.retentionDays = n;
+  }
+  if (values.budget !== undefined) {
+    try {
+      cfg.defaults.budgetBytes = parseByteSize(values.budget);
+    } catch (err) {
+      process.stderr.write(`--budget: ${err instanceof Error ? err.message : String(err)}\n`);
+      return 2;
+    }
   }
   if (values.delete) {
     cfg.defaults.delete = true;
@@ -128,23 +202,30 @@ export async function run(argv) {
   }
   const dryRun = Boolean(values["dry-run"]);
   const deleteMode = cfg.defaults.delete;
+  const json = Boolean(values.json);
+  const writeProgress = (text) => (json ? process.stderr : process.stdout).write(text);
 
-  process.stdout.write(
+  writeProgress(
     `ai-log-clean run (${dryRun ? "dry-run" : deleteMode ? "delete" : "archive-only"})\n`,
   );
-  process.stdout.write(`default retention: ${cfg.defaults.retentionDays}d\n`);
-  if (Number.isFinite(maxDeletes)) {
-    process.stdout.write(`max items this run: ${maxDeletes}\n`);
+  writeProgress(`default retention: ${cfg.defaults.retentionDays}d\n`);
+  if (cfg.defaults.budgetBytes !== null) {
+    writeProgress(`capacity budget: ${formatSize(cfg.defaults.budgetBytes)}\n`);
   }
-  process.stdout.write("\n");
+  if (Number.isFinite(maxDeletes)) {
+    writeProgress(`max items this run: ${maxDeletes}\n`);
+  }
+  writeProgress("\n");
 
   let worstExit = 0;
 
   if (!dryRun) {
     await mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
-    const { removed: purged, failed: pruneFailed } = await pruneQuarantine();
+    const { removed: purged, failed: pruneFailed } = await pruneQuarantine({
+      quarantineRoot: QUARANTINE_DIR,
+    });
     if (purged > 0) {
-      process.stdout.write(`  (pruned ${purged} expired quarantine batch(es))\n\n`);
+      writeProgress(`  (pruned ${purged} expired quarantine batch(es))\n\n`);
     }
     if (pruneFailed > 0) {
       worstExit = 1;
@@ -152,10 +233,13 @@ export async function run(argv) {
   }
 
   const today = todayStamp();
-  let actedProviders = 0;
-  let totalActed = 0;
-  let totalSize = 0;
   let remainingBudget = maxDeletes;
+  /** @type {Record<string, { files: number, bytes: number, action: string }>} */
+  const byProvider = {};
+  let capped = false;
+
+  const scannedProviders = [];
+  const budgetEnabled = cfg.defaults.budgetBytes !== null;
 
   for (const provider of PROVIDERS) {
     if (onlyProvider && provider !== onlyProvider) continue;
@@ -164,29 +248,75 @@ export async function run(argv) {
     const isDetected = await impl.detected();
 
     if (!enabled) {
-      process.stdout.write(`  ${provider.padEnd(14)}  skipped (disabled in config)\n`);
+      writeProgress(`  ${provider.padEnd(14)}  skipped (disabled in config)\n`);
       continue;
     }
     if (!isDetected) {
-      process.stdout.write(`  ${provider.padEnd(14)}  skipped (no session directory found)\n`);
+      writeProgress(`  ${provider.padEnd(14)}  skipped (no session directory found)\n`);
       continue;
     }
 
     const days = effectiveRetentionDays(cfg, provider);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     try {
-      const rawCandidates = await impl.scan(cutoff);
-      const candidates = applyExcludeFiles(
+      const rawCandidates = await impl.scan(
+        budgetEnabled ? new Date(8_640_000_000_000_000) : cutoff,
+      );
+      const allCandidates = applyExcludeFiles(
         rawCandidates,
         cfg.providers[provider].excludeFiles,
       );
-      const candidateSize = candidates.reduce((a, c) => a + c.size, 0);
+      const retentionCandidates = budgetEnabled
+        ? allCandidates.filter((candidate) => candidate.lastWriteTime < cutoff)
+        : allCandidates;
+      scannedProviders.push({ provider, days, allCandidates, retentionCandidates });
+    } catch (err) {
+      worstExit = 1;
+      process.stderr.write(
+        formatProviderError({
+          provider,
+          err,
+          othersContinued: !onlyProvider,
+        }),
+      );
+    }
+  }
+
+  const allBudgetCandidates = scannedProviders.flatMap(({ provider, allCandidates }) =>
+    allCandidates.map((candidate) => ({ provider, candidate })),
+  );
+  const retentionKeys = new Set(
+    scannedProviders.flatMap(({ provider, retentionCandidates }) =>
+      retentionCandidates.map((candidate) => budgetCandidateKey(provider, candidate)),
+    ),
+  );
+  const budgetSelection = selectBudgetCandidates(
+    allBudgetCandidates,
+    retentionKeys,
+    cfg.defaults.budgetBytes,
+  );
+
+  for (const { provider, days, allCandidates, retentionCandidates } of scannedProviders) {
+    const candidates = budgetEnabled
+      ? allCandidates.filter((candidate) =>
+          budgetSelection.selectedKeys.has(budgetCandidateKey(provider, candidate)),
+        )
+      : retentionCandidates;
+    const budgetExtra = budgetEnabled
+      ? candidates.filter((candidate) =>
+          budgetSelection.addedKeys.has(budgetCandidateKey(provider, candidate)),
+        ).length
+      : 0;
+    const candidateSize = candidates.reduce((a, c) => a + c.size, 0);
       let acted = 0;
       let bytesActed = 0;
 
       if (!dryRun) {
         for (const c of candidates) {
-          if (remainingBudget <= 0) break;
+          if (remainingBudget <= 0) {
+            if (candidates.length > acted) capped = true;
+            break;
+          }
           try {
             if (deleteMode) {
               await removePath(c.path);
@@ -217,39 +347,105 @@ export async function run(argv) {
             );
           }
         }
+      } else if (Number.isFinite(maxDeletes) && candidates.length > maxDeletes) {
+        // dry-run still reports full candidate set; flag cap intent for mode line
+        capped = true;
       }
 
-      const verb = dryRun ? "would" : deleteMode ? "deleted" : "archived";
+      const action = deleteMode ? "delete" : "archive";
       const reportCount = dryRun ? candidates.length : acted;
       const reportSize = dryRun ? candidateSize : bytesActed;
-      process.stdout.write(
-        `  ${provider.padEnd(14)}  retention=${days}d  candidates=${candidates.length}  ${verb}=${reportCount}  size=${formatSize(reportSize)}\n`,
+      const verb = dryRun ? "would" : deleteMode ? "deleted" : "archived";
+      writeProgress(
+        `  ${provider.padEnd(14)}  retention=${days}d  candidates=${candidates.length}${budgetExtra > 0 ? `  budget-extra=${budgetExtra}` : ""}  ${verb}=${reportCount}  size=${formatSize(reportSize)}\n`,
       );
-      if (!dryRun && acted > 0) actedProviders++;
-      totalActed += dryRun ? candidates.length : acted;
-      totalSize += dryRun ? candidateSize : bytesActed;
-    } catch (err) {
-      worstExit = 1;
-      process.stderr.write(
-        `  ${provider.padEnd(14)}  FAILED: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
+
+      if (reportCount > 0 || reportSize > 0) {
+        byProvider[provider] = {
+          files: reportCount,
+          bytes: reportSize,
+          action: dryRun ? (deleteMode ? "would-delete" : "would-archive") : action,
+        };
+      }
   }
 
-  process.stdout.write("\n");
-  if (totalActed === 0) {
+  const totalBytesForReport = Object.values(byProvider).reduce(
+    (sum, value) => sum + value.bytes,
+    0,
+  );
+  const budgetReport = budgetEnabled
+    ? {
+        budgetBytes: cfg.defaults.budgetBytes,
+        totalBytes: budgetSelection.totalBytes,
+        afterBytes: Math.max(0, budgetSelection.totalBytes - totalBytesForReport),
+      }
+    : null;
+  if (json) {
+    const totalFiles = Object.values(byProvider).reduce((sum, value) => sum + value.files, 0);
     process.stdout.write(
-      `Nothing to do. No files older than the configured retention were found.\n`,
-    );
-  } else if (dryRun) {
-    process.stdout.write(
-      `${totalActed} item(s) (${formatSize(totalSize)}) would be ${deleteMode ? "deleted" : "archived"}. Re-run without --dry-run to apply.\n`,
+      JSON.stringify({
+        dry_run: dryRun,
+        mode: deleteMode ? "delete" : "archive",
+        exit_code: worstExit,
+        totals: { files: totalFiles, bytes: totalBytesForReport, capped },
+        providers: Object.entries(byProvider).map(([name, value]) => ({
+          name,
+          files: value.files,
+          bytes: value.bytes,
+          action: value.action,
+        })),
+        would_free_bytes: dryRun ? totalBytesForReport : undefined,
+        budget: budgetReport && {
+          budget_bytes: budgetReport.budgetBytes,
+          total_bytes: budgetReport.totalBytes,
+          after_bytes: budgetReport.afterBytes,
+        },
+      }) + "\n",
     );
   } else {
-    const dest = deleteMode ? "deleted" : `archived to ${join(QUARANTINE_DIR, today)}`;
+    process.stdout.write("\n");
     process.stdout.write(
-      `${totalActed} item(s) (${formatSize(totalSize)}) ${dest}. ${actedProviders} provider(s) acted.\n`,
+      formatRunReport({
+        byProvider,
+        dryRun,
+        deleteMode,
+        maxDeletes,
+        capped,
+        budget: budgetReport,
+        pretty: isPrettyStdout(),
+      }),
     );
+  }
+
+  if (!dryRun) {
+    let totalFiles = 0;
+    let totalBytes = 0;
+    const lastByProvider = {};
+    for (const [name, v] of Object.entries(byProvider)) {
+      totalFiles += v.files;
+      totalBytes += v.bytes;
+      lastByProvider[name] = {
+        files: v.files,
+        bytes: v.bytes,
+        action: v.action,
+      };
+    }
+    const totals = { files: totalFiles, bytes: totalBytes };
+    if (capped) totals.capped = true;
+    if (budgetEnabled) {
+      totals.budgetBytes = cfg.defaults.budgetBytes;
+      totals.afterBytes = Math.max(0, budgetSelection.totalBytes - totalBytes);
+    }
+    const summary = {
+      finishedAt: new Date().toISOString(),
+      exitCode: worstExit,
+      dryRun: false,
+      mode: deleteMode ? "delete" : "archive",
+      totals,
+      byProvider: lastByProvider,
+    };
+    await writeLastRun(summary);
+    await appendHistory(summary);
   }
 
   return worstExit;

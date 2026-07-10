@@ -73,8 +73,36 @@ export async function run(argv) {
     interactive: !values.yes,
   });
 
-  process.stdout.write(`installed: daily at ${normalizeAt(at)}, retention=${retentionDays}d\n`);
+  process.stdout.write(
+    formatInstallSuccess({
+      at: normalizeAt(at),
+      retentionDays,
+      deleteMode: Boolean(values.delete),
+    }),
+  );
   return 0;
+}
+
+/**
+ * Success-only install guide (P4). Not printed on validation or scheduler failure.
+ *
+ * @param {{ at: string, retentionDays: number, deleteMode?: boolean }} opts
+ * @returns {string}
+ */
+export function formatInstallSuccess({ at, retentionDays, deleteMode = false }) {
+  const mode = deleteMode ? "delete" : "archive (not delete)";
+  const run = "npx -y github:ishizakahiroshi/ai-log-clean";
+  return [
+    `Installed  daily at ${at} · retention ${retentionDays}d · ${mode}`,
+    ``,
+    `  status   ${run} status`,
+    `  try now  ${run} --dry-run`,
+    `  pause    ${run} disable`,
+    ``,
+    `Config  ~/.ai-log-clean/config.toml`,
+    `Safe    no admin · user-scope task · default = archive only`,
+    ``,
+  ].join("\n");
 }
 
 /** Accept "H:MM" or "HH:MM" with hour 0-23 and minute 0-59. */

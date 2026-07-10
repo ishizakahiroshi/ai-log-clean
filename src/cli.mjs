@@ -25,6 +25,8 @@ const SUBCOMMANDS = {
   run: (rest) => import("./commands/run.mjs").then((m) => m.run(rest)),
   list: (rest) => import("./commands/list.mjs").then((m) => m.run(rest)),
   init: (rest) => import("./commands/init.mjs").then((m) => m.run(rest)),
+  doctor: (rest) => import("./commands/doctor.mjs").then((m) => m.run(rest)),
+  quarantine: (rest) => import("./commands/quarantine.mjs").then((m) => m.run(rest)),
 };
 
 const USAGE = `\
@@ -44,20 +46,31 @@ Subcommands:
   disable     Temporarily stop the schedule (keep config)
   enable      Resume the schedule
   status      Show schedule registration + last run summary
+              --json                output one JSON object
   run         Run cleanup once (this is what the scheduler invokes)
               --dry-run             plan only, no changes
               --delete              actually delete (default is archive-only)
-              --retention-days N    override per-run
-              --provider NAME       limit to one provider
-              --max-deletes N       cap removals per run
+               --retention-days N    override per-run
+               --budget SIZE         capacity limit (for example 2GB)
+               --provider NAME       limit to one provider
+               --max-deletes N       cap removals per run
+               --json                output one JSON object (progress goes to stderr)
   list        Show current size + oldest file per provider
+              --json                output one JSON object
   init        Write a config.toml template to ~/.ai-log-clean/
+  doctor      Self-check Node, npx, schedule, config, providers
+  quarantine  List or restore archived batches
+              list                show quarantine dates / sizes
+              prune [--dry-run]   remove expired quarantine batches
+              restore <YYYY-MM-DD> [--provider NAME] [--dry-run] [--force]
 
 Examples:
   bunx github:ishizakahiroshi/ai-log-clean --dry-run
   bunx github:ishizakahiroshi/ai-log-clean --dry-run --retention-days 30
   bunx github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 60
   bunx github:ishizakahiroshi/ai-log-clean list
+  bunx github:ishizakahiroshi/ai-log-clean doctor
+  bunx github:ishizakahiroshi/ai-log-clean quarantine list
   bunx github:ishizakahiroshi/ai-log-clean uninstall --purge
 
 Documentation: https://github.com/ishizakahiroshi/ai-log-clean
@@ -72,6 +85,7 @@ Documentation: https://github.com/ishizakahiroshi/ai-log-clean
 const OPTIONS_WITH_VALUE = new Set([
   "--at",
   "--retention-days",
+  "--budget",
   "--provider",
   "--max-deletes",
 ]);

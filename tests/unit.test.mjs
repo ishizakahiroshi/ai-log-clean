@@ -442,3 +442,62 @@ test("maybeBumpCleanupPeriodDays: updates / declines / skips correctly", async (
   assert.equal(missing.action, "skipped");
   assert.equal(missing.reason, "no-settings-file");
 });
+
+// --- C1 output/last-run ---
+
+test("formatRelative: past minutes / future hours / just now", async () => {
+  const { formatRelative } = await import("../src/utils/output.mjs");
+  const now = new Date("2026-07-10T12:00:00");
+  assert.equal(formatRelative(new Date(now.getTime() - 5 * 60 * 1000), now), "5m ago");
+  assert.equal(formatRelative(new Date(now.getTime() + 14 * 60 * 60 * 1000), now), "in 14h");
+  assert.equal(formatRelative(new Date(now.getTime() - 10 * 1000), now), "just now");
+  assert.equal(formatRelative(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), now), "in 3d");
+});
+
+test("formatBar: width and clamp at 0 / 1", async () => {
+  const { formatBar } = await import("../src/utils/output.mjs");
+  assert.equal(formatBar(0, 8), "░░░░░░░░");
+  assert.equal(formatBar(1, 8), "████████");
+  assert.equal(formatBar(0.5, 10).length, 10);
+  assert.equal(formatBar(-1, 4), "░░░░");
+  assert.equal(formatBar(2, 4), "████");
+  const colored = formatBar(1, 4, { color: true });
+  assert.match(colored, /████/);
+  assert.ok(colored.includes("\x1b["));
+  assert.equal(formatBar(0.5, 10, { color: false }).length, 10);
+});
+
+test("isPrettyStdout: NO_COLOR forces false", async () => {
+  const { isPrettyStdout } = await import("../src/utils/output.mjs");
+  assert.equal(isPrettyStdout({ isTTY: true }, { NO_COLOR: "1" }), false);
+  assert.equal(isPrettyStdout({ isTTY: true }, {}), true);
+  assert.equal(isPrettyStdout({ isTTY: false }, {}), false);
+});
+
+test("formatLocalDateTime: YYYY-MM-DD HH:mm shape", async () => {
+  const { formatLocalDateTime } = await import("../src/utils/output.mjs");
+  const s = formatLocalDateTime(new Date(2026, 6, 10, 9, 5)); // local July 10
+  assert.match(s, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  assert.equal(s, "2026-07-10 09:05");
+});
+
+test("last-run: write → read round-trip; bad JSON → null", async () => {
+  const { writeLastRun, readLastRun } = await import("../src/utils/last-run.mjs");
+  const root = await mkdtemp(join(tmpdir(), "alc-lastrun-"));
+  const path = join(root, "logs", "last-run.json");
+  const summary = {
+    finishedAt: "2026-07-10T12:00:00.000Z",
+    exitCode: 0,
+    dryRun: false,
+    mode: "archive",
+    totals: { files: 3, bytes: 1024 },
+    byProvider: { codex: { files: 3, bytes: 1024, action: "archive" } },
+  };
+  await writeLastRun(summary, { path });
+  const got = await readLastRun({ path });
+  assert.deepEqual(got, summary);
+
+  await writeFile(path, "{not json", "utf8");
+  assert.equal(await readLastRun({ path }), null);
+  assert.equal(await readLastRun({ path: join(root, "missing.json") }), null);
+});

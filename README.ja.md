@@ -30,6 +30,9 @@ npx -y github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 6
 npx -y github:ishizakahiroshi/ai-log-clean disable
 npx -y github:ishizakahiroshi/ai-log-clean enable
 
+# 自己診断（Node / npx / スケジュール / config / providers）
+npx -y github:ishizakahiroshi/ai-log-clean doctor
+
 # 完全に止める（設定・ログも消すなら --purge）
 npx -y github:ishizakahiroshi/ai-log-clean uninstall
 npx -y github:ishizakahiroshi/ai-log-clean uninstall --purge
@@ -62,10 +65,12 @@ provider 単位の有効/無効・retention 上書きは `~/.ai-log-clean/config
 ファイルを消すツールなので、既定は保守的にしてあります。
 
 - **既定はアーカイブのみ。** retention を超えたものは `~/.ai-log-clean/quarantine/<YYYY-MM-DD>/` にディレクトリ構造ごと退避します（圧縮なし）。quarantine は dry-run 以外の実行開始時に 30 日超を掃除します。
+- **quarantine から戻せる。** `quarantine list` では残り保持日数を表示し、`quarantine prune --dry-run` で期限切れ batch の掃除を確認できます。`quarantine restore <YYYY-MM-DD>` は既存の戻り先を skip しますが、明示した `--force` 時だけ上書きします。まず `restore --dry-run` を推奨します。
 - **実削除は `--delete` 明示時のみ。** CLI で渡すか、`config.toml` の `defaults.delete = true` で常時 ON にできます。
 - **`--dry-run` は計画だけ表示**して何も触りません。
 - **`--max-deletes N`** で 1 回の削除上限を設定。暴走しても N 件で止まります。
 - **provider 単位で隔離。** ある provider の掃除失敗が他の provider を巻き込みません。各 provider の成功/失敗が個別に報告され、終了コードは最悪値を反映します。
+- **自動化向け出力。** `list`・`status`・`run` は `--json` を受け付けます。`run --json` は stdout に JSON 1 オブジェクトだけを出し、進捗は stderr に出します。
 
 ## 設定
 

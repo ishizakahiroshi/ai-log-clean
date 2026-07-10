@@ -30,6 +30,9 @@ npx -y github:ishizakahiroshi/ai-log-clean install --at 12:00 --retention-days 6
 npx -y github:ishizakahiroshi/ai-log-clean disable
 npx -y github:ishizakahiroshi/ai-log-clean enable
 
+# Self-check (Node, npx, schedule, config, providers)
+npx -y github:ishizakahiroshi/ai-log-clean doctor
+
 # Remove the schedule and (optionally) the config + logs
 npx -y github:ishizakahiroshi/ai-log-clean uninstall
 npx -y github:ishizakahiroshi/ai-log-clean uninstall --purge
@@ -64,10 +67,12 @@ You can disable any provider or set per-provider retention in `~/.ai-log-clean/c
 This tool deletes files for a living, so the default is conservative.
 
 - **Default is archive-only.** Files past their retention are moved into `~/.ai-log-clean/quarantine/<YYYY-MM-DD>/` (directory layout preserved; no compression). Quarantine entries older than 30 days are removed at the start of each non-dry-run.
+- **Undo via quarantine.** `quarantine list` shows each batch's remaining retention; `quarantine prune --dry-run` previews expired-batch cleanup. `quarantine restore <YYYY-MM-DD>` skips existing destinations unless explicit `--force` is given. Prefer `restore --dry-run` first.
 - **Real deletion requires `--delete`.** Pass it on the CLI, or set `defaults.delete = true` in `config.toml`.
 - **`--dry-run` prints the plan** without touching anything.
 - **`--max-deletes N`** caps a single run at N file or directory removals — a runaway bug can only damage a bounded number of items.
 - **Provider isolation.** A failure cleaning one provider does not stop the others; the run reports per-provider success / failure and exit code reflects the worst case.
+- **Automation output.** `list`, `status`, and `run` accept `--json`; `run --json` emits one JSON object on stdout and sends progress to stderr.
 
 ## Configuration
 
