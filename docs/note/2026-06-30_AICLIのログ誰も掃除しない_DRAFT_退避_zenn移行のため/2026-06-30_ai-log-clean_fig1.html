@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- 本文図 fig1: 各 AI CLI のセッションログ容量実測（1280x720, .frame を PNG 化） -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<style>
+  html,body{margin:0;padding:0;background:#dde6f0}
+  .frame{
+    width:1280px;height:720px;
+    box-sizing:border-box;
+    background:linear-gradient(180deg,#f4f8fc 0%,#eef2f7 100%);
+    color:#1f2a37;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+    padding:48px 64px 36px;
+    overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  .eyebrow{font-size:22px;color:#5b6675;letter-spacing:.1em;font-weight:600}
+  .title{font-size:42px;font-weight:800;margin-top:6px;line-height:1.25}
+  .subtitle{font-size:22px;color:#5b6675;margin-top:8px}
+  .rows{margin-top:28px;display:flex;flex-direction:column;gap:14px;min-height:0;flex:1}
+  .row{display:flex;align-items:center;gap:14px;min-height:0}
+  .name{width:170px;font-size:21px;font-weight:700;color:#1f2a37;text-align:right;flex-shrink:0}
+  .bar-wrap{flex:1;height:34px;background:rgba(47,111,176,.10);border-radius:6px;position:relative;overflow:hidden}
+  .bar{height:100%;background:linear-gradient(90deg,#2f6fb0 0%,#5a96cf 100%);border-radius:6px}
+  .bar.accent{background:linear-gradient(90deg,#1f4d80 0%,#2f6fb0 100%)}
+  .value{width:140px;font-size:20px;font-weight:700;color:#1f2a37;flex-shrink:0}
+  .note{font-size:16px;color:#5b6675;margin-top:18px;line-height:1.5}
+  .footer{margin-top:14px;padding-top:12px;border-top:1px solid rgba(31,42,55,.12);font-size:18px;color:#5b6675;font-weight:600}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="eyebrow">AI CLI / SESSION LOG SIZE</div>
+  <div class="title">手元の AI CLI、それぞれどれだけ貯まっているか</div>
+  <div class="subtitle">2026-06-30 時点・1 台の開発機での実測（個人差は大きい）</div>
+
+  <div class="rows">
+    <div class="row">
+      <div class="name">Claude Code</div>
+      <div class="bar-wrap"><div class="bar accent" style="width:100%"></div></div>
+      <div class="value">1.41 GB</div>
+    </div>
+    <div class="row">
+      <div class="name">Codex CLI</div>
+      <div class="bar-wrap"><div class="bar" style="width:18%"></div></div>
+      <div class="value">253.8 MB</div>
+    </div>
+    <div class="row">
+      <div class="name">Copilot CLI</div>
+      <div class="bar-wrap"><div class="bar" style="width:1.2%"></div></div>
+      <div class="value">9.3 MB</div>
+    </div>
+    <div class="row">
+      <div class="name">Grok Build</div>
+      <div class="bar-wrap"><div class="bar" style="width:1.1%"></div></div>
+      <div class="value">8.9 MB</div>
+    </div>
+    <div class="row">
+      <div class="name">Cursor Agent</div>
+      <div class="bar-wrap"><div class="bar" style="width:0.5%"></div></div>
+      <div class="value">1.1 MB</div>
+    </div>
+    <div class="row">
+      <div class="name">Antigravity</div>
+      <div class="bar-wrap"><div class="bar" style="width:0.3%"></div></div>
+      <div class="value">172 KB</div>
+    </div>
+    <div class="row">
+      <div class="name">opencode</div>
+      <div class="bar-wrap"><div class="bar" style="width:0.3%"></div></div>
+      <div class="value">137 KB</div>
+    </div>
+  </div>
+
+  <div class="note">本体に retention があるのは Claude Code の cleanupPeriodDays だけ。<br>残り 6 つは入れた瞬間から書き残し続けて、消す仕掛けを持っていない。</div>
+  <div class="footer">ai-log-clean は、この 7 種類をひとまとめに retention 60 日で日次自動掃除します</div>
+</div>
+</body>
+</html>

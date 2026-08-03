@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-06-30T10:25:23.668940+09:00",
+  "summarizer_model": null,
+  "image_model": "gemini-3.1-flash-image",
+  "spec_source": "reused",
+  "input_md": null,
+  "input_md_sha1": null,
+  "output_png": "C:\\dev\\github\\public\\ai-log-clean\\docs\\note\\2026-06-30_AICLIのログ誰も掃除しない\\2026-06-30_ai-log-clean_infographic.png",
+  "output_png_bytes": 757149,
+  "candidates": [
+    "C:\\dev\\github\\public\\ai-log-clean\\docs\\note\\2026-06-30_AICLIのログ誰も掃除しない\\2026-06-30_ai-log-clean_infographic.png"
+  ],
+  "spec_yaml": "C:\\dev\\github\\public\\ai-log-clean\\docs\\note\\2026-06-30_AICLIのログ誰も掃除しない\\2026-06-30_ai-log-clean_infographic-spec.yaml",
+  "palette_resolved": {
+    "primary": "#0369a1",
+    "accent": "#16a34a",
+    "background": "#f1f5f9",
+    "text": "#0c4a6e"
+  }
+}

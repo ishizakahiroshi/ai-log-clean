@@ -1,0 +1,56 @@
+meta:
+  source: 2026-06-30_AICLIのログ誰も掃除しないので作ってます.md
+  generated_at: 2026-06-30 10:02:20.275838+09:00
+  schema_version: 1
+title:
+  text: AI CLIログ、自動掃除ツール
+  subtitle: 放置で肥大化するログを日次でクリーンアップ
+audience:
+  level: 業界実務者
+  tone: 解説寄り・中立
+key_points:
+- headline: AI CLIログ肥大化
+  detail: セッション履歴が蓄積し、ディスク容量を圧迫する問題
+  icon_hint: disk storage
+- headline: resume機能の代償
+  detail: 履歴維持のため、多くのCLIがログを無期限保存
+  icon_hint: history archive
+- headline: 自動掃除CLI
+  detail: ai-log-cleanが60日保持で日次クリーンアップ
+  icon_hint: cleaner tool
+- headline: 安心の削除フロー
+  detail: 30日間隔離後削除、dry-runで確認可能
+  icon_hint: shield security
+- headline: 簡単導入・運用
+  detail: npxで実行、OSスケジューラ登録で自動化
+  icon_hint: install setup
+must_include_numbers:
+- value: 1.4 GB
+  caption: ログ最大容量
+- value: 60 日
+  caption: 既定の保持期間
+- value: 7
+  caption: 対応CLI数
+flow:
+  pattern: top_to_bottom
+  sections:
+  - title
+  - key_points[0]
+  - key_points[1]
+  - key_points[2]
+  - key_points[3]
+  - key_points[4]
+call_to_action:
+  text: GitHubで詳細を見る
+  emphasis: medium
+visual:
+  orientation: square
+  style: professional
+  palette: data_scientific
+  language: ja
+forbid:
+- 個別企業名
+- 個人名
+- 製品名
+- 個別CLI名の表記（特にGrok単独表記は禁止。記事本文では「Grok Build」と表記している）
+- AI CLIの製品名・ロゴ・固有名詞の焼き込み

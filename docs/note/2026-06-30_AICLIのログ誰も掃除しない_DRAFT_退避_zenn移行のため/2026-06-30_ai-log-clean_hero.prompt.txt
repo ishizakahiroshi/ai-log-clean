@@ -1,0 +1,7 @@
+A calm flat illustration in cool clear paper-and-blue palette: an old desk with a slim laptop seen from a soft three-quarter angle, screen glowing in pale teal-blue, surrounded by gently stacked translucent paper sheets and abstract data-card shapes drifting like quiet snow around the laptop. The piles tilt and slump under their own weight, hinting at "logs slowly accumulating forever". Background is a smooth pale paper-blue gradient (#eef2f7 → #dde6f0), no patterns. Color base: paper white, dusty cream, soft slate, with a single accent of muted azure (#2f6fb0). Soft cool morning light from upper left. Editorial illustration, generous negative space.
+
+Keep the upper third of the image visually quiet (simple background, soft shading, no busy details) so that title text can be composited cleanly on top. Keep the bottom-right area clean and simple for a separately-composited mascot. Keep the bottom ~12% of the image as a clean, empty, smooth margin with no important elements (safe bleed for cropping).
+
+No text, no typography, no captions, no watermarks of any kind anywhere in the image. No cats, no people, no logos, no brand marks, no UI screenshots, no terminal windows with readable code.
+
+landscape, wide 16:9
