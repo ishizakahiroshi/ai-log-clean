@@ -57,6 +57,7 @@ npx -y github:ishizakahiroshi/ai-log-clean uninstall --purge
 | opencode | `$XDG_DATA_HOME/opencode/log/*.log`, `.../storage/session_diff/*.json` | なし | ファイル単位。XDG パスは OS 別に解決（Linux `~/.local/share/`、macOS `~/Library/Application Support/`、Windows `%APPDATA%`）。 |
 | Grok | `~/.grok/sessions/<encoded>/<uuid>/` | なし | セッションディレクトリ単位。`~/.grok/logs/unified.jsonl` は append-only なので **対象外**（部分削除すると整合性が壊れる）。 |
 | Antigravity CLI (`agy`) | `~/.gemini/antigravity-cli/brain/<id>/`, `.../conversations/<id>.db*`, `.../log/cli-*.log` | なし | `brain/<id>/` はセッションディレクトリ単位、SQLite 3 点セット（`.db` / `.db-shm` / `.db-wal`）は max mtime でグループ単位、CLI ログはファイル単位。`bin/` / `builtin/` / `cache/` / `knowledge/` / `settings.json` / `history.jsonl` は対象外。旧 `gemini` CLI は 2026-06-18 で停止済み・後継の Antigravity が同じ `~/.gemini/` を継承して使うため本 provider が一括で面倒を見ます（旧 `~/.gemini/tmp/` 残骸は **触らない**）。 |
+| many-ai-cli | `~/.many-ai-cli/subscriptions/<vendor>/<profile>/` （`claude/.../projects/<encoded-cwd>/*.jsonl`, `codex/.../sessions/YYYY/MM/DD/rollout-*.jsonl`, `grok/.../sessions/<encoded>/<uuid>/`） | なし | many-ai-cli は各ベンダー CLI を profile ごとの HOME で 起動するため、profile 配下はそのベンダー本来のレイアウトと同じ形になります。判定規則は同じベンダーの ネイティブ provider と揃えたものを profile ごとに適用します。対象はセッション記録のパスのみで、profile 直下の設定ファイル・workbench のソース・`history.jsonl`・セッション索引には触れません。ネイティブ provider が無いベンダーは推測せずスキップします。 |
 
 provider 単位の有効/無効・retention 上書きは `~/.ai-log-clean/config.toml` で設定できます（`npx -y github:ishizakahiroshi/ai-log-clean init` で雛形生成）。
 
@@ -103,6 +104,9 @@ enabled       = true
 exclude_files = ["logs/unified.jsonl"]
 
 [providers.antigravity]
+enabled = true
+
+[providers.many_ai_cli]
 enabled = true
 ```
 

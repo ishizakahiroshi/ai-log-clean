@@ -20,6 +20,11 @@ versions.
   retention (`--yes` auto-applies; non-TTY prints a hint).
 - Zero-dependency TOML subset loader for `~/.ai-log-clean/config.toml`.
 - Antigravity CLI (`agy`) provider (`~/.gemini/antigravity-cli/`).
+- many-ai-cli provider (`~/.many-ai-cli/subscriptions/<vendor>/<profile>/`).
+  Covers the claude / codex / grok profile HOMEs that many-ai-cli creates,
+  reusing each vendor's native matching rules. Enabled by default because
+  many-ai-cli has no retention setting of its own; profile roots (config,
+  workbench sources, `history.jsonl`, session indexes) are never enumerated.
 - Unit tests for config, quarantine safety, CLI routing, scheduler builders,
   Claude settings merge (Node built-in `node:test`).
 

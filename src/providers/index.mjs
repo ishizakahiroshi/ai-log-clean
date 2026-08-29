@@ -13,6 +13,7 @@ import * as cursorAgent from "./cursor-agent.mjs";
 import * as opencode from "./opencode.mjs";
 import * as grok from "./grok.mjs";
 import * as antigravity from "./antigravity.mjs";
+import * as manyAiCli from "./many-ai-cli.mjs";
 
 export const PROVIDER_REGISTRY = {
   claude_code: claudeCode,
@@ -22,4 +23,5 @@ export const PROVIDER_REGISTRY = {
   opencode: opencode,
   grok: grok,
   antigravity: antigravity,
+  many_ai_cli: manyAiCli,
 };

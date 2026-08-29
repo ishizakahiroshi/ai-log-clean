@@ -32,6 +32,7 @@ export const PROVIDERS = [
   "opencode",
   "grok",
   "antigravity",
+  "many_ai_cli",
 ];
 
 export const CONFIG_DIR = join(homedir(), ".ai-log-clean");
@@ -54,6 +55,7 @@ export function defaultConfig() {
       opencode: { enabled: true },
       grok: { enabled: true, excludeFiles: ["logs/unified.jsonl"] },
       antigravity: { enabled: true },
+      many_ai_cli: { enabled: true },
     },
   };
 }
@@ -350,5 +352,8 @@ enabled       = true
 exclude_files = ["logs/unified.jsonl"]
 
 [providers.antigravity]
+enabled = true
+
+[providers.many_ai_cli]
 enabled = true
 `;

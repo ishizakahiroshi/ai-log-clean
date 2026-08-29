@@ -243,6 +243,7 @@ test("parseConfigToml: CONFIG_TEMPLATE round-trips into a valid shape", () => {
   validateConfigShape(cfg);
   assert.equal(cfg.providers.claude_code.enabled, false);
   assert.equal(cfg.providers.antigravity.enabled, true);
+  assert.equal(cfg.providers.many_ai_cli.enabled, true);
   assert.deepEqual(cfg.providers.grok.excludeFiles, ["logs/unified.jsonl"]);
 });
 

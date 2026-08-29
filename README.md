@@ -59,6 +59,7 @@ invocation, so a fix on `main` reaches you on the next run. `-y` skips the
 | opencode | `$XDG_DATA_HOME/opencode/log/*.log`, `.../storage/session_diff/*.json` | No | Per-file. XDG path is resolved per OS (`~/.local/share/`, `~/Library/Application Support/`, `%APPDATA%`). |
 | Grok | `~/.grok/sessions/<encoded>/<uuid>/` | No | Per-session-directory. `~/.grok/logs/unified.jsonl` is **excluded** because it is append-only — pruning it mid-stream would corrupt the journal. |
 | Antigravity CLI (`agy`) | `~/.gemini/antigravity-cli/brain/<id>/`, `.../conversations/<id>.db*`, `.../log/cli-*.log` | No | Per-session-directory for `brain/<id>/`; SQLite triple (`.db` / `.db-shm` / `.db-wal`) archived as one group by max mtime; CLI logs per-file. `bin/`, `builtin/`, `cache/`, `knowledge/`, `settings.json`, `history.jsonl` are left alone. The old `gemini` CLI was discontinued on 2026-06-18 and is **not** handled — Antigravity is its successor and reuses `~/.gemini/`. |
+| many-ai-cli | `~/.many-ai-cli/subscriptions/<vendor>/<profile>/` (`claude/.../projects/<encoded-cwd>/*.jsonl`, `codex/.../sessions/YYYY/MM/DD/rollout-*.jsonl`, `grok/.../sessions/<encoded>/<uuid>/`) | No | many-ai-cli runs each vendor CLI against a per-profile HOME, so each profile mirrors that vendor's own layout. Matching rules stay in step with the native provider of the same vendor, per profile. Only transcript paths are in scope — the profile root also holds live config, workbench sources, `history.jsonl` and session indexes, which are left alone. Vendors without a native provider are skipped rather than guessed at. |
 
 You can disable any provider or set per-provider retention in `~/.ai-log-clean/config.toml` (`npx -y github:ishizakahiroshi/ai-log-clean init` writes a template).
 
@@ -105,6 +106,9 @@ enabled       = true
 exclude_files = ["logs/unified.jsonl"]
 
 [providers.antigravity]
+enabled = true
+
+[providers.many_ai_cli]
 enabled = true
 ```
 

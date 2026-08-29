@@ -29,6 +29,7 @@ import * as cursorAgent from "../providers/cursor-agent.mjs";
 import * as opencode from "../providers/opencode.mjs";
 import * as grok from "../providers/grok.mjs";
 import * as antigravity from "../providers/antigravity.mjs";
+import * as manyAiCli from "../providers/many-ai-cli.mjs";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -53,6 +54,7 @@ export function defaultProviderRoots() {
     cursor_agent: cursorAgent.chatsDir(),
     grok: grok.sessionsDir(),
     antigravity: antigravity.rootDir(),
+    many_ai_cli: manyAiCli.sessionsDir(),
     // copilot: process-*.log files use logsDir; everything else session-state
     copilot: (rel) => {
       const base = basename(String(rel).replace(/\\/g, "/"));

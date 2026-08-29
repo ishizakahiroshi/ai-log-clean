@@ -41,7 +41,7 @@ ai-log-clean/
 │  ├─ cli.mjs                # サブコマンドルーター
 │  ├─ config.mjs             # ~/.ai-log-clean/config.toml の読み書き
 │  ├─ commands/              # サブコマンド本体（install / uninstall / run / list / status / enable / disable / init）
-│  ├─ providers/             # provider ごとの掃除ロジック（claude-code / codex / copilot / cursor-agent / opencode / grok / antigravity）
+│  ├─ providers/             # provider ごとの掃除ロジック（claude-code / codex / copilot / cursor-agent / opencode / grok / antigravity / many-ai-cli）
 │  ├─ scheduler/             # OS 別スケジューラ登録（windows / macos / linux）
 │  └─ utils/                 # 共有ユーティリティ（fs 等）
 ├─ tests/
