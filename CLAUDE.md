@@ -98,6 +98,7 @@ ai-log-clean/
 
 | 項目 | パス |
 |---|---|
+| **どのファイルが何をして、どのテーブルを読み書きするか**（探す前にここ） | `.omitnix/index.json`。全ファイルの索引とテーブル逆引き。**解析できなかったファイルも名前と理由付きで載る**ので「索引に無い」と「読めなかった」を取り違えない。参照 0 件は「未使用」ではない。**`generated.commit` が HEAD と違えば索引はその commit 時点のもの**なので、古いまま断定せず `omitnix` で作り直すか、古いことを添えて答える |
 | ユーザー向け README | `README.md` / `README.ja.md` |
 | Codex/他 AI 用入口 | `AGENTS.md` |
 | 設計の経緯（仕様 HTML） | many-ai-cli リポ `docs/local/ai-log-clean-spec/`（参考） |
