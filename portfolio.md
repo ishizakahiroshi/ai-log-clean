@@ -1,4 +1,11 @@
 ---
+cover:
+  path: portfolio/overview-2026-09-28.jpg
+  alt: {ja: "ai-log-clean の紹介動画", en: "ai-log-clean overview video"}
+video:
+  provider: youtube
+  id: "YlfKiEC8yfo"
+  durationSeconds: 20
 schemaVersion: 1
 color: "#6f8a9e"
 initials: "al"
