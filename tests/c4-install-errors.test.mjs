@@ -69,7 +69,7 @@ test("formatProviderError: EPERM partial + permission hint", () => {
 test("formatProviderError: EACCES same family as EPERM", () => {
   const err = Object.assign(new Error("denied"), {
     code: "EACCES",
-    path: "C:\\Users\\dev\\.codex\\sessions\\x",
+    path: "C:\\Users\\dev\\.codex\\sessions\\x", // doxguard: allow Users
   });
   const out = formatProviderError({
     provider: "codex",

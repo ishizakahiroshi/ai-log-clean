@@ -12,7 +12,7 @@ if [ "$(git config --local --get doxguard.prerelease.enabled)" = true ]; then
 fi
 # doxguard prerelease opt-in end
 # secrets-scan layer 2 (per-commit). 設計: docs/local/secrets-scan-design/index.html
-node scripts/secrets-scan.mjs --staged --block || exit 1
+node scripts/secrets-scan.dual.mjs --staged || exit 1
 
 # --- omitnix: 生成物の鮮度検査（2026-09-11 追加） ---
 # コミット済みの .omitnix/index.json が、いまのソースと食い違っていたら止める。
