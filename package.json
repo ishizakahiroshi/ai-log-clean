@@ -10,8 +10,8 @@
   "scripts": {
     "start": "node src/cli.mjs",
     "test": "node --test tests/*.test.mjs",
-    "scan": "node scripts/secrets-scan.mjs --staged --block",
-    "scan:all": "node scripts/secrets-scan.mjs --all-tracked --block",
+    "scan": "node scripts/secrets-scan.dual.mjs --staged",
+    "scan:all": "node scripts/secrets-scan.dual.mjs --all-tracked",
     "prepare": "husky"
   },
   "author": "ishizakahiroshi <ishizakahiroshi.dev@gmail.com>",
