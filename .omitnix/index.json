@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated": {
-    "commit": "fe38028475e7dcb89618daf2a0be97dc275582c8",
+    "commit": "87e1542d84ae35ec7469d9fd9c5fc521ca88b78a",
     "dirty": true,
     "tool": "omitnix 0.1.3",
     "partial": false,
@@ -138,16 +138,24 @@
     "discovery_note": ""
   },
   "coverage": {
-    "discovered": 80,
+    "discovered": 81,
     "analyzed": 53,
     "unresolved": 0,
     "unknown": 0,
-    "unclaimed": 27,
+    "unclaimed": 28,
     "skipped_by_config": 0
   },
   "files": [
     {
       "path": ".github/workflows/ci.yml",
+      "adapter": null,
+      "status": "unclaimed",
+      "fields": {},
+      "unresolved": [],
+      "reason": "no adapter claims '.yml'"
+    },
+    {
+      "path": ".github/workflows/gitleaks.yml",
       "adapter": null,
       "status": "unclaimed",
       "fields": {},

@@ -234,6 +234,7 @@ function main(argv) {
   process.stdout.write(JSON.stringify({ expectedSourceSha: expected ?? null, actualHead: head, ...output }) + '\n');
   process.exitCode = output.exit;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+const isEntry = () => { try { return import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href; } catch { return false; } };
+if (process.argv[1] && isEntry()) {
   try { main(process.argv.slice(2)); } catch { process.stderr.write('dual-scan: invalid configuration, target mode, or checkout identity\n'); process.exitCode = 2; }
 }
