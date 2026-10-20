@@ -49,7 +49,7 @@ ai-log-clean/
 ├─ assets/
 │  └─ run-hidden.vbs         # Windows 用コンソール非表示 VBS（install 時に展開）
 ├─ scripts/
-│  └─ secrets-scan.mjs       # secrets-scan 層 2/3/4 共通スキャナ
+│  └─ secrets-scan.dual.mjs  # doxguard 実行アダプタ（secrets-scan.staged.mjs 含む）
 ├─ .husky/pre-commit         # layer 2 hook
 ├─ .github/workflows/        # layer 3 CI (secrets-scan.yml / ci.yml = smoke + unit tests)
 └─ docs/local/               # 非公開ノート（gitignored）
@@ -70,7 +70,7 @@ ai-log-clean/
 
 - ローカルで実行: `node src/cli.mjs --dry-run` または `bun src/cli.mjs --dry-run`
 - テスト実行: `node --test tests/unit.test.mjs`
-- secrets-scan 手動実行: `node scripts/secrets-scan.mjs --staged --block`
+- secrets-scan 手動実行: `node scripts/secrets-scan.dual.mjs --native-only --staged`（doxguard）
 - **ビルドステップなし**: `.mjs` を直接配布。`main` に push したら次回 `npx -y` 起動で即反映（bunx は cache のため強制リフレッシュが必要）
 
 ## AI 作業共通ルール
@@ -89,9 +89,9 @@ ai-log-clean/
 
 層 1 の共通責務（固有名詞の一般化・fixture は合成データ）はグローバル `~/.claude/CLAUDE.md` に従う。本リポ固有:
 
-- 手動実行: `node scripts/secrets-scan.mjs --staged --block`
+- 手動実行: `node scripts/secrets-scan.dual.mjs --native-only --staged`（doxguard。CI は gitleaks も併用）
 - 機械層: layer 2 = `.husky/pre-commit`（husky）/ layer 3 = GitHub Actions `secrets-scan.yml` / layer 4 = release ゲート
-- env（full coverage に必要・未設定なら構造 regex のみで継続）: `KB_ROOT` / `FAMILY_ROOT`。設定詳細は `scripts/secrets-scan.mjs` の冒頭コメント
+- env（full coverage に必要・未設定なら構造 regex のみで継続）: `DOXGUARD_CONFIG`（private watchlist への参照）。CI は構造パターンのみ
 - 参照実装・設計詳細: `worklog-bridge` リポの `docs/local/secrets-scan-design/`（gitignored・公開しない）
 
 ## 関連ドキュメント
